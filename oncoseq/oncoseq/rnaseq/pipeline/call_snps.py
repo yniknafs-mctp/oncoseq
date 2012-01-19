@@ -9,7 +9,7 @@ import subprocess
 import sys
 import os
 
-from pantyhose.lib import config
+from oncoseq.lib import config
 
 def call_snps(ref_fa, bam_file, bcf_file, vcf_file):
     # call snps and store in BCF file

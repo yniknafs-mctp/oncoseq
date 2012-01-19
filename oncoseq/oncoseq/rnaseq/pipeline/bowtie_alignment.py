@@ -9,11 +9,11 @@ import logging
 import subprocess
 import argparse
 
-from pantyhose.lib.seq import SANGER_FORMAT, SOLEXA_FORMAT, ILLUMINA_FORMAT
-from pantyhose.lib import config
+from oncoseq.lib.seq import SANGER_FORMAT, SOLEXA_FORMAT, ILLUMINA_FORMAT
+from oncoseq.lib import config
 
-import pantyhose.pipeline
-_pipeline_dir = pantyhose.pipeline.__path__[0]
+import oncoseq.rnaseq.pipeline
+_pipeline_dir = oncoseq.rnaseq.pipeline.__path__[0]
 _fix_order_script = os.path.join(_pipeline_dir, "fix_alignment_ordering.py")
 
 translate_quals = {SOLEXA_FORMAT: 'solexa-quals',

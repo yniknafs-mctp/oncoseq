@@ -14,6 +14,11 @@ from fragment_size_distribution import FragmentSizeDistribution
 JOB_SUCCESS = 0
 JOB_ERROR = 1
 
+# remote job constants
+REMOTE_ANALYSIS_XML_FILE = "analysis.xml"
+REMOTE_CONFIG_XML_FILE = "config.xml"
+REMOTE_CODE_TARGZ_FILE = "code.tar.gz"
+
 # job file constants
 READ1_FASTQ_FILE = "read1.fq"
 READ2_FASTQ_FILE = "read2.fq"
@@ -337,48 +342,56 @@ class GenomeConfig(object):
         g = GenomeConfig()
         g.species = elem.get("name")
         g.root_dir = elem.findtext("root_dir")
-        g.abundant_bowtie_index = os.path.join(g.root_dir, elem.findtext("abundant_bowtie_index"))
-        g.genome_bowtie_index = os.path.join(g.root_dir, elem.findtext("genome_bowtie_index"))
-        g.genome_fasta_file = os.path.join(g.root_dir, elem.findtext("genome_fasta_file"))
-        g.fragment_size_bowtie_index = os.path.join(g.root_dir, elem.findtext("fragment_size_bowtie_index"))
-        g.gene_annotation_refflat = os.path.join(g.root_dir, elem.findtext("gene_annotation_refflat"))
-        g.picard_ribosomal_intervals = os.path.join(g.root_dir, elem.findtext("picard_ribosomal_intervals"))        
-        g.chrom_sizes = os.path.join(g.root_dir, elem.findtext("chrom_sizes"))
+        g.abundant_bowtie_index = elem.findtext("abundant_bowtie_index")
+        g.genome_bowtie_index = elem.findtext("genome_bowtie_index")
+        g.genome_fasta_file = elem.findtext("genome_fasta_file")
+        g.fragment_size_bowtie_index = elem.findtext("fragment_size_bowtie_index")
+        g.gene_annotation_refflat = elem.findtext("gene_annotation_refflat")
+        g.picard_ribosomal_intervals = elem.findtext("picard_ribosomal_intervals")        
+        g.chrom_sizes = elem.findtext("chrom_sizes")
         return g
-    
-    def prepend_dir(self, mydir):
-        self.root_dir = os.path.join(mydir, self.root_dir)
-        self.abundant_bowtie_index = os.path.join(mydir, self.abundant_bowtie_index)
-        self.genome_bowtie_index = os.path.join(mydir, self.genome_bowtie_index)
-        self.genome_fasta_file = os.path.join(mydir, self.genome_fasta_file)
-        self.fragment_size_bowtie_index = os.path.join(mydir, self.fragment_size_bowtie_index)
-        self.gene_annotation_refflat = os.path.join(mydir, self.gene_annotation_refflat)
-        self.picard_ribosomal_intervals = os.path.join(mydir, self.picard_ribosomal_intervals)        
-        self.chrom_sizes = os.path.join(mydir, self.chrom_sizes)
+
+    def to_xml(self, root):
+        root.set("name", self.species)
+        for attrname in ("root_dir",
+                         "abundant_bowtie_index",
+                         "genome_bowtie_index",
+                         "genome_fasta_file",
+                         "fragment_size_bowtie_index",
+                         "gene_annotation_refflat",
+                         "picard_ribosomal_intervals",
+                         "chrom_sizes"):
+            elem = etree.SubElement(root, attrname)
+            elem.text = str(getattr(self, attrname))            
+
+    def get_path(self, attr_name):
+        return os.path.join(self.root_dir, getattr(self, attr_name))
     
     def is_valid(self, references_dir=""):
         valid = True
-        if not os.path.exists(os.path.join(references_dir, self.abundant_bowtie_index + ".1.ebwt")):
+        abs_root_dir = os.path.join(references_dir, self.root_dir)
+        if not os.path.exists(abs_root_dir):
+            logging.error("genome root directory %s not found" % (self.root_dir))
+            valid = False            
+        if not os.path.exists(os.path.join(abs_root_dir, self.abundant_bowtie_index + ".1.ebwt")):
             logging.error("Abundant bowtie index %s not found" % (self.abundant_bowtie_index))
             valid = False
-        if not os.path.exists(os.path.join(references_dir, self.abundant_bowtie_index + ".fa")):
+        if not os.path.exists(os.path.join(abs_root_dir, self.abundant_bowtie_index + ".fa")):
             logging.error("Abundant sequences fasta file %s not found" % (self.abundant_bowtie_index))
             valid = False
-        if not os.path.exists(os.path.join(references_dir, self.genome_bowtie_index + ".1.ebwt")):
+        if not os.path.exists(os.path.join(abs_root_dir, self.genome_bowtie_index + ".1.ebwt")):
             logging.error("Genome bowtie index %s not found" % (self.genome_bowtie_index))
             valid = False
-        if not os.path.exists(os.path.join(references_dir, self.genome_fasta_file)):
-            logging.error("Genome fasta file %s not found" % (self.genome_fasta_file))
+        if not os.path.exists(os.path.join(abs_root_dir, self.fragment_size_bowtie_index + ".1.ebwt")):
+            logging.error("Fragment size bowtie index %s not found" % (self.fragment_size_bowtie_index))
             valid = False
-        if not os.path.exists(os.path.join(references_dir, self.gene_annotation_refflat)):
-            logging.error("refFlat gene annotation %s not found" % (self.gene_annotation_refflat))
-            valid = False
-        if not os.path.exists(os.path.join(references_dir, self.picard_ribosomal_intervals)):
-            logging.error("Ribosomal intervals file %s not found" % (self.picard_ribosomal_intervals))
-            valid = False
-        if not os.path.exists(os.path.join(references_dir, self.chrom_sizes)):
-            logging.error("Chrom sizes file %s not found" % (self.chrom_sizes))
-            valid = False
+        for attrname in ("genome_fasta_file",
+                         "gene_annotation_refflat",
+                         "picard_ribosomal_intervals",
+                         "chrom_sizes"):
+            if not os.path.exists(os.path.join(abs_root_dir, getattr(self, attrname))):
+                logging.error("Genome file %s not found" % (getattr(self, attrname)))
+                valid = False
         return valid
 
 class ServerConfig(object):
@@ -406,6 +419,30 @@ class ServerConfig(object):
             c.pbs_script_lines.append(line_elem.text)
         return c
     
+    def to_xml(self, root):
+        root.set("name", self.name)
+        root.set("address", str(self.address))
+        root.set("ssh_port", str(self.ssh_port))
+        for attrname in ("modules_init_script",
+                         "output_dir",
+                         "tmp_dir",
+                         "references_dir",
+                         "node_mem",
+                         "node_processors"):
+            elem = etree.SubElement(root, attrname)
+            elem.text = str(getattr(self, attrname))            
+        if self.pbs:
+            elem = etree.SubElement(root, "pbs")
+            elem.text = "yes"
+            elem = etree.SubElement(root, "max_user_jobs")
+            elem.text = str(self.max_user_jobs)
+        else:
+            elem = etree.SubElement(root, "pbs")
+            elem.text = "no"
+        for line in self.pbs_script_lines:
+            elem = etree.SubElement(root, "script_line")
+            elem.text = line
+
     def is_valid(self):
         valid = True
         # check directories
@@ -462,15 +499,15 @@ class PipelineConfig(object):
         c.min_fragment_size = int(root.findtext("min_fragment_size"))
         c.max_fragment_size = int(root.findtext("max_fragment_size"))
         # tophat parameters
-        elem = root.find("tophat")
         c.tophat_args = []
-        for line_elem in elem.findall("arg"):
-            c.tophat_args.append(line_elem.text)
+        elem = root.find("tophat")
+        for arg_elem in elem.findall("arg"):
+            c.tophat_args.append(arg_elem.text)
         # cufflinks parameters
-        elem = root.find("cufflinks")
         c.cufflinks_args = []
-        for line_elem in elem.findall("arg"):
-            c.cufflinks_args.append(line_elem.text)
+        elem = root.find("cufflinks")
+        for arg_elem in elem.findall("arg"):
+            c.cufflinks_args.append(arg_elem.text)
         # server setup
         c.servers = {}
         for elem in root.findall("server"):
@@ -482,6 +519,46 @@ class PipelineConfig(object):
             g = GenomeConfig.from_xml_elem(elem)
             c.species[g.species] = g
         return c
+
+    def to_xml(self, output_file):
+        root = etree.Element("pipeline")
+        # modules
+        modules_elem = etree.SubElement(root, "modules")
+        for m in self.modules:
+            elem = etree.SubElement(modules_elem, "module")
+            elem.text = m
+        # fragment size parameters
+        for attrname in ("fragment_size_mean_default",
+                         "fragment_size_stdev_default",
+                         "adaptor_length_default",
+                         "min_fragment_size",
+                         "max_fragment_size"):
+            elem = etree.SubElement(root, attrname)
+            elem.text = str(getattr(self, attrname))
+        # tophat parameters
+        tophat_elem = etree.SubElement(root, "tophat")
+        for arg in self.tophat_args:
+            elem = etree.SubElement(tophat_elem, "arg")
+            elem.text = arg
+        # cufflinks parameters
+        cufflinks_elem = etree.SubElement(root, "cufflinks")
+        for arg in self.cufflinks_args:
+            elem = etree.SubElement(cufflinks_elem, "arg")
+            elem.text = arg
+        # servers
+        for server in self.servers.itervalues():            
+            elem = etree.SubElement(root, "server")
+            server.to_xml(elem)
+        # genomes
+        for genome in self.species.itervalues():
+            elem = etree.SubElement(root, "species")
+            genome.to_xml(elem)
+        # output files
+        f = open(output_file, "w")
+        # indent for pretty printing
+        indent_xml(root)
+        print >>f, etree.tostring(root)
+        f.close() 
 
     def is_valid(self, server_name):
         """

@@ -7,8 +7,8 @@ import argparse
 import logging
 import sys
 
-from pantyhose.lib import config
-from pantyhose.lib.fragment_size_distribution import FragmentSizeDistribution
+from oncoseq.lib import config
+from oncoseq.lib.fragment_size_distribution import FragmentSizeDistribution
 
 def main():
     logging.basicConfig(level=logging.DEBUG,

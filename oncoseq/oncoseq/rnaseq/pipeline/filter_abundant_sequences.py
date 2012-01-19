@@ -10,8 +10,8 @@ import logging
 import pysam
 
 # project imports
-from pantyhose.lib.sam import parse_reads_by_qname
-from pantyhose.lib.seq import DNA_reverse_complement
+from oncoseq.lib.sam import parse_reads_by_qname
+from oncoseq.lib.seq import DNA_reverse_complement
 
 def to_fastq(r, f):
     seq = DNA_reverse_complement(r.seq) if r.is_reverse else r.seq

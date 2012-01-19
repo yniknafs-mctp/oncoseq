@@ -10,11 +10,11 @@ import os
 import subprocess
 
 # project imports
-from pantyhose.lib import config
-from pantyhose.lib.fragment_size_distribution import FragmentSizeDistribution
+from oncoseq.lib import config
+from oncoseq.lib.fragment_size_distribution import FragmentSizeDistribution
 
-import pantyhose.pipeline
-_pipeline_dir = pantyhose.pipeline.__path__[0]
+import oncoseq.rnaseq.pipeline
+_pipeline_dir = oncoseq.rnaseq.pipeline.__path__[0]
 
 MIN_SAMPLES = 100
 

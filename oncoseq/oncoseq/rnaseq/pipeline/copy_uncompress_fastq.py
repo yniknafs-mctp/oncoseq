@@ -8,8 +8,8 @@ import logging
 import os
 import sys
 
-from pantyhose.lib import config
-from pantyhose.lib.seq import get_qual_conversion_func, FASTQ_QUAL_FORMATS, open_compressed
+from oncoseq.lib import config
+from oncoseq.lib.seq import get_qual_conversion_func, FASTQ_QUAL_FORMATS, open_compressed
 
 def parse_lines(line_iter, numlines=1):
     """

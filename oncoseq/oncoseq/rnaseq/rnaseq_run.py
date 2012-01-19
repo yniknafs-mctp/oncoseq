@@ -10,18 +10,18 @@ import os
 import datetime
 import subprocess
 
-from pantyhose.lib import config
-from pantyhose.lib.config import AnalysisConfig, PipelineConfig
-from pantyhose.lib.cluster import scp, ssh_exec, qstat_user_job_count
-import rnaseq_run_monitor as runmonitor
+from oncoseq.lib import config
+from oncoseq.lib.config import AnalysisConfig, PipelineConfig
+from oncoseq.lib.cluster import scp, ssh_exec, qstat_user_job_count, remote_copy_file
+from oncoseq.lib import rundb
 
-import pantyhose
-_pantyhose_dir = pantyhose.__path__[0]
-import pantyhose.pipeline
-_pipeline_dir = pantyhose.pipeline.__path__[0] 
+import oncoseq
+_oncoseq_dir = oncoseq.__path__[0]
+import oncoseq.rnaseq.pipeline
+_pipeline_dir = oncoseq.rnaseq.pipeline.__path__[0] 
 
 def run_local(analysis_file, config_file, server_name, num_processors, 
-              db, keep_tmp):
+              db, keep_tmp, local_tmp_dir):
     """
     db: sqlite db file
     """
@@ -53,7 +53,7 @@ def run_local(analysis_file, config_file, server_name, num_processors,
     return retcode
 
 def run_remote(analysis_file, config_file, server_name, num_processors, 
-               db, keep_tmp):
+               db, keep_tmp, local_tmp_dir):
     """
     db: sqlite db file
     """
@@ -64,6 +64,14 @@ def run_remote(analysis_file, config_file, server_name, num_processors,
     analysis = AnalysisConfig.from_xml(analysis_file)
     # get server parameters
     server = pipeline.servers[server_name]
+    # setup remote job directory and job name
+    timestamp_string = datetime.datetime.now().strftime("%Y-%m-%d-%H%M%S%f")
+    job_name = "job_%s" % (timestamp_string)
+    job_output_dir = os.path.join(server.output_dir, job_name)
+    # update server output directory
+    server.output_dir = job_output_dir
+    # set copy parameters
+    remote_copy_max_size_bytes = (8 << 30)
     # if running on a PBS queue, check to make sure the job limit is not 
     # exceeded
     if server.pbs:
@@ -92,7 +100,7 @@ def run_remote(analysis_file, config_file, server_name, num_processors,
     # make working directory and copy sequence files 
     # 
     for sample in analysis.samples:
-        sample_path = os.path.join(server.output_dir, sample.id)
+        sample_path = os.path.join(job_output_dir, sample.id)
         #
         # make working dir
         #
@@ -107,19 +115,33 @@ def run_remote(analysis_file, config_file, server_name, num_processors,
                 logging.info("Copying lane %s read1 fastq file" % (lane.id))
                 ext = os.path.splitext(lane.read1_file)[-1]
                 remote_read1_file = os.path.join(sample_path, lane.id + "_1" + ext)
-                scp(lane.read1_file, server.address + ":" + remote_read1_file, server.ssh_port)
+                retcode = remote_copy_file(lane.read1_file, remote_read1_file, 
+                                           server.address, username, server.ssh_port, 
+                                           maxsize=remote_copy_max_size_bytes, 
+                                           tmp_dir="/tmp")
+                #scp(lane.read1_file, server.address + ":" + remote_read1_file, server.ssh_port)
+                # check that copy worked by comparing file sizes
+                if retcode != 0:
+                    logging.error("Copy of read 1 failed")
+                    return config.JOB_ERROR
                 lane.read1_file = remote_read1_file
                 if lane.read2_file is not None:
                     logging.info("Copying lane %s read2 fastq file" % (lane.id))
                     ext = os.path.splitext(lane.read2_file)[-1]
                     remote_read2_file = os.path.join(sample_path, lane.id + "_2" + ext)
-                    scp(lane.read2_file, server.address + ":" + remote_read2_file, server.ssh_port)
+                    retcode = remote_copy_file(lane.read2_file, remote_read2_file, 
+                                               server.address, username, server.ssh_port, 
+                                               maxsize=remote_copy_max_size_bytes, 
+                                               tmp_dir="/tmp")
+                    if retcode != 0:
+                        logging.error("Copy of read 2 failed")
+                        return config.JOB_ERROR
                     lane.read2_file = remote_read2_file
     #
     # copy analysis file to remote location
     #
     logging.info("Copying analysis XML file")
-    remote_analysis_file = os.path.join(server.output_dir, os.path.basename(analysis_file))         
+    remote_analysis_file = os.path.join(job_output_dir, config.REMOTE_ANALYSIS_XML_FILE)
     analysis.to_xml("tmp_analysis.xml")
     scp("tmp_analysis.xml", server.address + ":" + remote_analysis_file, server.ssh_port)
     os.remove("tmp_analysis.xml")
@@ -127,29 +149,27 @@ def run_remote(analysis_file, config_file, server_name, num_processors,
     # copy configuration file to remote location
     #
     logging.info("Copying pipeline configuration XML file")
-    remote_config_file = os.path.join(server.output_dir, os.path.basename(config_file))         
-    scp(config_file, server.address + ":" + remote_config_file, server.ssh_port)
+    remote_config_file = os.path.join(job_output_dir, config.REMOTE_CONFIG_XML_FILE)
+    pipeline.to_xml("tmp_pipeline_config.xml")
+    scp("tmp_pipeline_config.xml", server.address + ":" + remote_config_file, server.ssh_port)
+    os.remove("tmp_pipeline_config.xml")    
     #
     # package and copy source code to remote location
     #    
     logging.info("Packaging source code")
-    source_code_file = "tmp_pantyhose_code.tar.gz"
-    local_code_py_path = os.path.dirname(pantyhose.__path__[0])
-    args = ["tar", "-C", local_code_py_path, "-zcvf", source_code_file, "pantyhose"]
+    source_code_file = "tmp_oncoseq_code.tar.gz"
+    local_code_py_path = os.path.dirname(oncoseq.__path__[0])
+    args = ["tar", "-C", local_code_py_path, "-zcvf", source_code_file, "oncoseq"]
     retcode = subprocess.call(args)
     if retcode != 0:
         logging.error("Error while packaging source code with args: %s" % (" ".join(map(str, args))))
-    # create remote directory for code
-    timestamp_string = datetime.datetime.now().strftime("%Y-%m-%d-%H%M%S%f")
-    remote_code_dir = os.path.join(server.output_dir, "pantyhose_%s" % (timestamp_string)) 
-    ssh_exec(server.address, "mkdir -p %s" % (remote_code_dir), server.ssh_port)
     # copy source code
     logging.info("Copying source code")
-    remote_code_targz = os.path.join(remote_code_dir, "code.tar.gz")
+    remote_code_targz = os.path.join(job_output_dir, config.REMOTE_CODE_TARGZ_FILE)
     scp(source_code_file, server.address + ":" + remote_code_targz, server.ssh_port)
     # unpack source code
     logging.info("Unpacking source code")
-    ssh_exec(server.address, "tar -C %s -zxvf %s" % (remote_code_dir, remote_code_targz), server.ssh_port)
+    ssh_exec(server.address, "tar -C %s -zxvf %s" % (job_output_dir, remote_code_targz), server.ssh_port)
     os.remove(source_code_file)
     #
     # submit analysis job
@@ -158,10 +178,10 @@ def run_remote(analysis_file, config_file, server_name, num_processors,
     # setup environment prior to run
     commands = ["source %s" % (server.modules_init_script),
                 "cd %s" % (server.output_dir),
-                "export PYTHONPATH=%s:$PYTHONPATH" % (remote_code_dir)]                
+                "export PYTHONPATH=%s:$PYTHONPATH" % (job_output_dir)]                
     for name in pipeline.modules:
         commands.append("module add %s" % (name))
-    py_script = os.path.join(remote_code_dir, "pantyhose", "pipeline", "run_analysis.py")
+    py_script = os.path.join(job_output_dir, "oncoseq", "pipeline", "run_analysis.py")
     run_cmd = ["python", py_script, "-p", num_processors, "--rm-fastq"]
     if keep_tmp:
         run_cmd.append("--keep-tmp")
@@ -172,9 +192,10 @@ def run_remote(analysis_file, config_file, server_name, num_processors,
     # mark job as "running" in database
     #
     if db is not None:
+        logging.info("Inserting job %s into db %s" % (job_name, db))
         if not os.path.exists(db):
-            runmonitor.create_db(db)        
-        runmonitor.insert(db, analysis_file)
+            rundb.create_db(db)
+        rundb.insert(db, job_name)
     return 0
 
 def main():
@@ -183,6 +204,7 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("-p", type=int, dest="num_processors", default=1)
     parser.add_argument("--db", dest="db_file", default=None)
+    parser.add_argument("--tmp-dir", dest="local_tmp_dir", help="local temp dir", default="/tmp")
     parser.add_argument("--local", dest="run_local", action="store_true", default=False)
     parser.add_argument("--keep-tmp", action="store_true", dest="keep_tmp", default=False)
     parser.add_argument("analysis_file")
@@ -195,7 +217,7 @@ def main():
         run_func = run_remote    
     return run_func(args.analysis_file, args.config_file, 
                     args.server_name, args.num_processors,
-                    args.db_file, args.keep_tmp)
+                    args.db_file, args.keep_tmp, args.local_tmp_dir)
 
 if __name__ == '__main__': 
     sys.exit(main())

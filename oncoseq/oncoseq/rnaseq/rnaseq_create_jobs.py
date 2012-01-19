@@ -9,7 +9,7 @@ import argparse
 import logging
 import xml.etree.cElementTree as etree
 
-from pantyhose.lib.seqdb import SeqDB
+from oncoseq.lib.seqdb import SeqDB
 
 # in-place XML prettyprint formatter
 def indent_xml(elem, level=0):

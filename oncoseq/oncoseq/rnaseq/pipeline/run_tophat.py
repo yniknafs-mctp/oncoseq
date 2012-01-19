@@ -9,9 +9,9 @@ import subprocess
 import os
 import sys
 
-from pantyhose.lib import config
-from pantyhose.lib.fragment_size_distribution import FragmentSizeDistribution
-from pantyhose.lib.seq import detect_read_length
+from oncoseq.lib import config
+from oncoseq.lib.fragment_size_distribution import FragmentSizeDistribution
+from oncoseq.lib.seq import detect_read_length
 
 def run_tophat(output_dir, fastq_files, frag_size_dist_file,
                bowtie_index, library_type, num_processors,

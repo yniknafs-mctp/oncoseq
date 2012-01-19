@@ -8,15 +8,15 @@ import logging
 import sys
 import os
 
-from pantyhose.lib import config
-from pantyhose.lib.config import AnalysisConfig, PipelineConfig
-from pantyhose.lib.cluster import submit_job_pbs, submit_job_nopbs
-from pantyhose.lib.base import up_to_date
-from pantyhose.lib.seq import SANGER_FORMAT
+from oncoseq.lib import config
+from oncoseq.lib.config import AnalysisConfig, PipelineConfig
+from oncoseq.lib.cluster import submit_job_pbs, submit_job_nopbs
+from oncoseq.lib.base import up_to_date
+from oncoseq.lib.seq import SANGER_FORMAT
 
 # setup pipeline script files
-import pantyhose.pipeline
-_pipeline_dir = pantyhose.pipeline.__path__[0] 
+import oncoseq.rnaseq.pipeline
+_pipeline_dir = oncoseq.rnaseq.pipeline.__path__[0] 
 
 def run_lane(lane, genome, server, pipeline, num_processors,
              submit_job_func):
@@ -101,7 +101,7 @@ def run_lane(lane, genome, server, pipeline, num_processors,
                     "--keep-unmapped",
                     "--keep-maxmulti",
                     lane.copied_fastq_files[readnum],
-                    genome.abundant_bowtie_index,
+                    os.path.join(server.references_dir, genome.get_path("abundant_bowtie_index")),
                     abundant_sam_file]
             log_file = os.path.join(log_dir, "bowtie_abundant_seq_read%d.log" % (readnum+1))
             logging.debug("\targs: %s" % (' '.join(map(str, args))))
@@ -194,7 +194,7 @@ def run_lane(lane, genome, server, pipeline, num_processors,
                 "--default-adaptor-length", pipeline.adaptor_length_default,
                 "-p", num_processors,
                 "-n", 1000000,
-                genome.fragment_size_bowtie_index,
+                os.path.join(server.references_dir, genome.get_path("fragment_size_bowtie_index")),
                 lane.frag_size_dist_file,
                 lane.frag_size_dist_plot_file]
         args.extend(lane.filtered_fastq_files)   
@@ -232,10 +232,10 @@ def run_lane(lane, genome, server, pipeline, num_processors,
                 '--rg-platform="%s"' % lane.platform]
         for arg in pipeline.tophat_args:
             # substitute species-specific root directory
-            species_arg = arg.replace("${SPECIES}", genome.root_dir)
+            species_arg = arg.replace("${SPECIES}", os.path.join(server.references_dir, genome.root_dir)) 
             args.extend(['--tophat-arg="%s"' % species_arg])
         args.extend([lane.tophat_dir,
-                     genome.genome_bowtie_index,
+                     os.path.join(server.references_dir, genome.get_path("genome_bowtie_index")),
                      lane.frag_size_dist_file])
         args.extend(lane.filtered_fastq_files)
         logging.debug("\targs: %s" % (' '.join(map(str, args))))
@@ -266,7 +266,7 @@ def run_lane(lane, genome, server, pipeline, num_processors,
         args = ["java", "-jar", 
                 os.path.join(pipeline.picard_dir, "CollectMultipleMetrics.jar"),
                 "INPUT=%s" % (lane.tophat_bam_file),
-                "REFERENCE_SEQUENCE=%s" % (genome.genome_fasta_file),
+                "REFERENCE_SEQUENCE=%s" % os.path.join(server.references_dir, genome.get_path("genome_fasta_file")),
                 "OUTPUT=lane",
                 "ASSUME_SORTED=TRUE",
                 "TMP_DIR=%s" % tmp_dir,
@@ -294,10 +294,10 @@ def run_lane(lane, genome, server, pipeline, num_processors,
         args = ["java", "-jar", 
                 os.path.join(pipeline.picard_dir, "CollectRnaSeqMetrics.jar"),
                 "INPUT=%s" % (lane.tophat_bam_file),
-                "REF_FLAT=%s" % (genome.gene_annotation_refflat),
-                "RIBOSOMAL_INTERVALS=%s" % genome.picard_ribosomal_intervals,
+                "REF_FLAT=%s" % (os.path.join(server.references_dir, genome.get_path("gene_annotation_refflat"))),
+                "RIBOSOMAL_INTERVALS=%s" % (os.path.join(server.references_dir, genome.get_path("picard_ribosomal_intervals"))),
                 "STRAND_SPECIFICITY=%s" % config.get_picard_strand_specificity(lane.library.strand_protocol),                
-                "REFERENCE_SEQUENCE=%s" % (genome.genome_fasta_file),
+                "REFERENCE_SEQUENCE=%s" % (os.path.join(server.references_dir, genome.get_path("genome_fasta_file"))),
                 "OUTPUT=%s" % (lane.rnaseq_metrics),
                 "CHART_OUTPUT=%s" % (lane.rnaseq_metrics_pdf),
                 "TMP_DIR=%s" % tmp_dir]
@@ -325,7 +325,7 @@ def run_lane(lane, genome, server, pipeline, num_processors,
     else:
         logging.info(msg)
         args = [os.path.join(pipeline.bedtools_dir, "genomeCoverageBed"),
-                "-bg", "-split", "-g", genome.chrom_sizes,
+                "-bg", "-split", "-g", (os.path.join(server.references_dir, genome.get_path("chrom_sizes"))),
                 "-ibam", lane.tophat_bam_file]
         log_file = os.path.join(log_dir, "genomeCoverageBed.log")
         logging.debug("\targs: %s" % (' '.join(map(str, args))))
@@ -350,7 +350,7 @@ def run_lane(lane, genome, server, pipeline, num_processors,
         logging.info(msg)
         args = [os.path.join(pipeline.ucsc_dir, "bedGraphToBigWig"),
                 lane.coverage_bedgraph_file,
-                genome.chrom_sizes,
+                os.path.join(server.references_dir, genome.get_path("chrom_sizes")),
                 lane.coverage_bigwig_file]
         log_file = os.path.join(log_dir, "bedGraphToBigWig.log")
         job_id = submit_job_func("bigwig_%s" % (lane.id), args,
@@ -466,7 +466,7 @@ def run_library(library, genome, server, pipeline, num_processors,
     else:
         logging.info(msg)
         args = [sys.executable, os.path.join(_pipeline_dir, "call_snps.py"),
-                genome.genome_fasta_file,
+                os.path.join(server.references_dir, genome.get_path("genome_fasta_file")),
                 library.merged_bam_file,
                 library.variant_bcf_file,
                 library.variant_vcf_file]
@@ -505,7 +505,7 @@ def run_library(library, genome, server, pipeline, num_processors,
             args.append("--learn-frag-size")
         for arg in pipeline.cufflinks_args:
             # substitute species-specific root directory
-            species_arg = arg.replace("${SPECIES}", genome.root_dir)
+            species_arg = arg.replace("${SPECIES}", os.path.join(server.references_dir, genome.root_dir)),
             args.append('--cufflinks-arg="%s"' % (species_arg))
         args.extend([library.merged_bam_file,
                      library.cufflinks_dir,
@@ -560,7 +560,6 @@ def run_analysis(analysis_file, config_file, server_name,
         submit_job_func = submit_job_nopbs
     # setup genome references
     genome = pipeline.species[analysis.species]
-    genome.prepend_dir(server.references_dir)    
     #
     # validate configuration files
     #

@@ -11,8 +11,8 @@ import sys
 import pysam
 
 # project imports
-from pantyhose.lib import config
-from pantyhose.lib.fragment_size_distribution import FragmentSizeDistribution
+from oncoseq.lib import config
+from oncoseq.lib.fragment_size_distribution import FragmentSizeDistribution
 
 def process_fragment_size_sam(sam_file,
                               fastq_file,

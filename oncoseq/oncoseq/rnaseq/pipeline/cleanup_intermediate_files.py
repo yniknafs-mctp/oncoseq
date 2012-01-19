@@ -8,8 +8,8 @@ import logging
 import sys
 import os
 
-from pantyhose.lib import config
-from pantyhose.lib.config import AnalysisConfig, validate_sample_results
+from oncoseq.lib import config
+from oncoseq.lib.config import AnalysisConfig, validate_sample_results
 
 def main():
     logging.basicConfig(level=logging.DEBUG,

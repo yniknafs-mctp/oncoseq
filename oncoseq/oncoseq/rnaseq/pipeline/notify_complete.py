@@ -7,7 +7,7 @@ import argparse
 import logging
 import sys
 
-from pantyhose.lib import config
+from oncoseq.lib import config
 
 def main():
     logging.basicConfig(level=logging.DEBUG,
