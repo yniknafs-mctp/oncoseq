@@ -179,7 +179,7 @@ def run_remote(analysis_file, config_file, server_name, num_processors,
                 "export PYTHONPATH=%s:$PYTHONPATH" % (job_output_dir)]                
     for name in pipeline.modules:
         commands.append("module add %s" % (name))
-    py_script = os.path.join(job_output_dir, "oncoseq", "pipeline", "run_analysis.py")
+    py_script = os.path.join(job_output_dir, "oncoseq", "rnaseq", "pipeline", "run_analysis.py")
     run_cmd = ["python", py_script, "-p", num_processors, "--rm-fastq"]
     if keep_tmp:
         run_cmd.append("--keep-tmp")
