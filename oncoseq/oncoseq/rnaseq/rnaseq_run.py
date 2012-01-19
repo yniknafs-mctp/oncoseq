@@ -15,8 +15,6 @@ from oncoseq.lib.config import AnalysisConfig, PipelineConfig
 from oncoseq.lib.cluster import scp, ssh_exec, qstat_user_job_count, remote_copy_file
 from oncoseq.lib import rundb
 
-import oncoseq
-_oncoseq_dir = oncoseq.__path__[0]
 import oncoseq.rnaseq.pipeline
 _pipeline_dir = oncoseq.rnaseq.pipeline.__path__[0] 
 
