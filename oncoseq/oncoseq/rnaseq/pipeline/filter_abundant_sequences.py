@@ -46,7 +46,7 @@ def filter_abundant_sequences(bam_file,
                         else:
                             r.is_read1 = True
                         mapped_reads.append(r)
-                pe_mapped_reads.append(mapped_reads) 
+                pe_mapped_reads.append(mapped_reads)
             if all((len(mapped_reads) == 0) for mapped_reads in pe_mapped_reads):
                 for readnum, reads in enumerate(pe_reads):
                     to_fastq(reads[0], fastq_files[readnum])            

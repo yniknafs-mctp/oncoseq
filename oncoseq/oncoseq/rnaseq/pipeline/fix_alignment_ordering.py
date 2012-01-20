@@ -40,7 +40,7 @@ def fix_sr_alignment_ordering(samfh, fastqfh, maxlen=100000):
     qname_read_dict = {}
     for read in samfh:
         # set key for indexing reads
-        key = read.qname
+        key = read.qname.split()[0]
         # check if this read is already in the buffer
         if key not in qname_read_dict:
             # if buffer full empty the first entries

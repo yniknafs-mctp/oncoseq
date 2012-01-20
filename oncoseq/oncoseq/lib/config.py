@@ -489,6 +489,7 @@ class PipelineConfig(object):
         c.rscript_bin = "Rscript"
         c.bowtie_bin = "bowtie"
         c.tophat_bin = "tophat"
+        c.fix_map_ordering_bin = "fix_map_ordering"
         c.cufflinks_bin = "cufflinks"
         c.bedtools_dir = ""
         c.ucsc_dir = ""
@@ -617,6 +618,12 @@ class PipelineConfig(object):
             valid = False
         msg = 'tophat'
         if check_executable(self.tophat_bin):
+            logging.debug("Checking for '%s' binary... found" % msg)
+        else:
+            logging.error("'%s' binary not found or not executable" % msg)
+            valid = False
+        msg = 'fix_map_ordering'
+        if check_executable(self.fix_map_ordering_bin):
             logging.debug("Checking for '%s' binary... found" % msg)
         else:
             logging.error("'%s' binary not found or not executable" % msg)
