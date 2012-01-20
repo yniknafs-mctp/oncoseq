@@ -181,7 +181,9 @@ def run_remote(analysis_file, config_file, server_name, num_processors,
     for name in pipeline.modules:
         commands.append("module add %s" % (name))
     py_script = os.path.join(job_output_dir, "oncoseq", "rnaseq", "pipeline", "run_analysis.py")
-    run_cmd = ["python", py_script, "-p", num_processors, "--rm-fastq"]
+    run_cmd = ["python", py_script, "-p", num_processors]
+    # No longer need to remove remote fastq because this is deleted during 'copy remote' step
+    # run_cmd = ["python", py_script, "-p", num_processors, "--rm-fastq"]
     if keep_tmp:
         run_cmd.append("--keep-tmp")
     run_cmd.extend([remote_analysis_file, remote_config_file, server_name])
