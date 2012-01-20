@@ -44,6 +44,15 @@ def get_remote_file_size(remote_file, remote_address, username, port):
     file_size_bytes = int(res.strip().split()[0])
     return file_size_bytes
 
+def test_file_exists(remote_file, remote_address, username, port):
+    command = 'test -s %s && echo 1' % (remote_file)
+    args = map(str, ["ssh", "-p", port, remote_address, '%s' % (command)])
+    logging.debug("\targs: %s" % (args))
+    p = subprocess.Popen(args, stdout=subprocess.PIPE)
+    res = p.communicate()[0]
+    exists = (res.strip() == "1")
+    return exists
+
 def remote_copy_file(src, dst, remote_address, username, port, maxsize=(8<<30), tmp_dir="/tmp"):
     # maxsize should be bigger than 1mb
     maxsize = max(maxsize, (1<<20))

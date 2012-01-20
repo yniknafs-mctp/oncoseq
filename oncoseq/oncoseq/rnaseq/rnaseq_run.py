@@ -12,7 +12,7 @@ import subprocess
 
 from oncoseq.lib import config
 from oncoseq.lib.config import AnalysisConfig, PipelineConfig
-from oncoseq.lib.cluster import scp, ssh_exec, qstat_user_job_count, remote_copy_file
+from oncoseq.lib.cluster import scp, ssh_exec, qstat_user_job_count, remote_copy_file, test_file_exists
 from oncoseq.lib import rundb
 
 import oncoseq.rnaseq.pipeline
@@ -106,35 +106,36 @@ def run_remote(analysis_file, config_file, server_name, num_processors,
         ssh_exec(server.address, "mkdir -p %s" % (sample_path), server.ssh_port)
         for library in sample.libraries:
             for lane in library.lanes:
-                #
-                # copy fastq files to remote location and 
-                # replace fastq fields in XML file
-                #
-                logging.info("Copying lane %s read1 fastq file" % (lane.id))
-                ext = os.path.splitext(lane.read1_file)[-1]
-                remote_read1_file = os.path.join(sample_path, lane.id + "_1" + ext)
-                retcode = remote_copy_file(lane.read1_file, remote_read1_file, 
-                                           server.address, username, server.ssh_port, 
-                                           maxsize=remote_copy_max_size_bytes, 
-                                           tmp_dir="/tmp")
-                #scp(lane.read1_file, server.address + ":" + remote_read1_file, server.ssh_port)
-                # check that copy worked by comparing file sizes
-                if retcode != 0:
-                    logging.error("Copy of read 1 failed")
-                    return config.JOB_ERROR
-                lane.read1_file = remote_read1_file
-                if lane.read2_file is not None:
-                    logging.info("Copying lane %s read2 fastq file" % (lane.id))
-                    ext = os.path.splitext(lane.read2_file)[-1]
-                    remote_read2_file = os.path.join(sample_path, lane.id + "_2" + ext)
-                    retcode = remote_copy_file(lane.read2_file, remote_read2_file, 
-                                               server.address, username, server.ssh_port, 
-                                               maxsize=remote_copy_max_size_bytes, 
-                                               tmp_dir="/tmp")
-                    if retcode != 0:
-                        logging.error("Copy of read 2 failed")
-                        return config.JOB_ERROR
-                    lane.read2_file = remote_read2_file
+                for attrname in ("read1_file", "read2_file"):
+                    fq = getattr(lane, attrname)
+                    found = False
+                    if server.seq_repo_mirror_dir is not None:
+                        # test if file exists at remote server sequence 
+                        # repository mirror
+                        remote_file = os.path.join(server.seq_repo_mirror_dir,
+                                                   os.path.basename(fq))
+                        if test_file_exists(remote_file, server.address, 
+                                            username, server.ssh_port):
+                            setattr(lane, attrname, remote_file)
+                            found = True
+                            logging.info("Found fastq file %s at %s" % (fq, remote_file))
+                        else:
+                            logging.info("Fastq file %s not found on remote server" % (fq))                            
+                    if not found:
+                        # copy fastq files to remote location and 
+                        # replace fastq fields in XML file
+                        logging.info("Copying lane %s read1 fastq file" % (lane.id))
+                        ext = os.path.splitext(lane.read1_file)[-1]
+                        remote_file = os.path.join(sample_path, lane.id + "_1" + ext)
+                        retcode = remote_copy_file(lane.read1_file, remote_file, 
+                                                   server.address, username, server.ssh_port, 
+                                                   maxsize=remote_copy_max_size_bytes, 
+                                                   tmp_dir="/tmp")
+                        if retcode != 0:
+                            logging.error("Copy of read 1 failed")
+                            # TODO: cleanup?
+                            return config.JOB_ERROR
+                        setattr(lane, attrname, remote_file)
     #
     # copy analysis file to remote location
     #

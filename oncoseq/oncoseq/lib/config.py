@@ -404,6 +404,7 @@ class ServerConfig(object):
         c.modules_init_script = elem.findtext("modules_init_script")
         c.output_dir = elem.findtext("output_dir")
         c.tmp_dir = elem.findtext("tmp_dir")
+        c.seq_repo_mirror_dir = elem.findtext("seq_repo_mirror_dir", None)
         c.references_dir = elem.findtext("references_dir")
         c.node_mem = float(elem.findtext("node_mem"))
         c.node_processors = int(elem.findtext("node_processors"))
@@ -427,10 +428,13 @@ class ServerConfig(object):
                          "output_dir",
                          "tmp_dir",
                          "references_dir",
+                         "seq_repo_mirror_dir",
                          "node_mem",
                          "node_processors"):
-            elem = etree.SubElement(root, attrname)
-            elem.text = str(getattr(self, attrname))            
+            attrval = getattr(self,attrname)
+            if attrval is not None:
+                elem = etree.SubElement(root, attrname)
+                elem.text = str(attrval)
         if self.pbs:
             elem = etree.SubElement(root, "pbs")
             elem.text = "yes"
