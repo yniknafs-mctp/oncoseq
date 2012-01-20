@@ -106,28 +106,28 @@ def run_remote(analysis_file, config_file, server_name, num_processors,
         ssh_exec(server.address, "mkdir -p %s" % (sample_path), server.ssh_port)
         for library in sample.libraries:
             for lane in library.lanes:
-                for attrname in ("read1_file", "read2_file"):
-                    fq = getattr(lane, attrname)
+                for readnum,attrname in enumerate(("read1_file", "read2_file")):
+                    local_file = getattr(lane, attrname)
                     found = False
                     if server.seq_repo_mirror_dir is not None:
                         # test if file exists at remote server sequence 
                         # repository mirror
                         remote_file = os.path.join(server.seq_repo_mirror_dir,
-                                                   os.path.basename(fq))
+                                                   os.path.basename(local_file))
                         if test_file_exists(remote_file, server.address, 
                                             username, server.ssh_port):
                             setattr(lane, attrname, remote_file)
                             found = True
-                            logging.info("Found fastq file %s at %s" % (fq, remote_file))
+                            logging.info("Found fastq file %s at %s" % (local_file, remote_file))
                         else:
-                            logging.info("Fastq file %s not found on remote server" % (fq))                            
+                            logging.info("Fastq file %s not found on remote server" % (local_file))                            
                     if not found:
                         # copy fastq files to remote location and 
                         # replace fastq fields in XML file
-                        logging.info("Copying lane %s read1 fastq file" % (lane.id))
-                        ext = os.path.splitext(lane.read1_file)[-1]
-                        remote_file = os.path.join(sample_path, lane.id + "_1" + ext)
-                        retcode = remote_copy_file(lane.read1_file, remote_file, 
+                        logging.info("Copying lane %s fastq file" % (lane.id))
+                        ext = os.path.splitext(local_file)[-1]
+                        remote_file = os.path.join(sample_path, "%s_%d%s" % (lane.id, readnum+1, ext))
+                        retcode = remote_copy_file(local_file, remote_file, 
                                                    server.address, username, server.ssh_port, 
                                                    maxsize=remote_copy_max_size_bytes, 
                                                    tmp_dir="/tmp")
