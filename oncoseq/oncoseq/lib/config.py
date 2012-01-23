@@ -488,8 +488,8 @@ class PipelineConfig(object):
         c.samtools_bin = "samtools"
         c.rscript_bin = "Rscript"
         c.bowtie_bin = "bowtie"
+        c.bowtie2_bin = "bowtie2"
         c.tophat_bin = "tophat"
-        c.fix_map_ordering_bin = "fix_map_ordering"
         c.cufflinks_bin = "cufflinks"
         c.bedtools_dir = ""
         c.ucsc_dir = ""
@@ -616,14 +616,14 @@ class PipelineConfig(object):
         else:
             logging.error("'%s' binary not found or not executable" % msg)
             valid = False
-        msg = 'tophat'
-        if check_executable(self.tophat_bin):
+        msg = 'bowtie2'
+        if check_executable(self.bowtie2_bin):
             logging.debug("Checking for '%s' binary... found" % msg)
         else:
             logging.error("'%s' binary not found or not executable" % msg)
             valid = False
-        msg = 'fix_map_ordering'
-        if check_executable(self.fix_map_ordering_bin):
+        msg = 'tophat'
+        if check_executable(self.tophat_bin):
             logging.debug("Checking for '%s' binary... found" % msg)
         else:
             logging.error("'%s' binary not found or not executable" % msg)

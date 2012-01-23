@@ -12,7 +12,6 @@ from oncoseq.lib import config
 from oncoseq.lib.config import AnalysisConfig, PipelineConfig
 from oncoseq.lib.cluster import submit_job_pbs, submit_job_nopbs
 from oncoseq.lib.base import up_to_date
-from oncoseq.lib.seq import SANGER_FORMAT
 
 # setup pipeline script files
 import oncoseq.rnaseq.pipeline
@@ -85,25 +84,21 @@ def run_lane(lane, genome, server, pipeline, num_processors,
                                  stderr_filename=log_file)
     #
     # map reads against abundant sequences
-    #
-    msg = "Mapping reads against abundant sequences"
+    #    
+    msg = "Mapping reads against abundant sequences using bowtie2"
     abundant_mapping_deps = []
     for readnum in xrange(len(lane.copied_fastq_files)):
         abundant_sam_file = lane.abundant_sam_files[readnum]
         if up_to_date(abundant_sam_file, lane.copied_fastq_files[readnum]):
             logging.info("[SKIPPED] %s read%d" % (msg, readnum+1))
         else:
-            logging.info("%s read%d" % (msg, readnum+1))       
-            args = [sys.executable, os.path.join(_pipeline_dir, "bowtie_alignment.py"),
-                    "-p", num_processors,
-                    "--quals", SANGER_FORMAT,
-                    "--maxhits", 1,
-                    "--keep-unmapped",
-                    "--keep-maxmulti",
-                    lane.copied_fastq_files[readnum],
-                    os.path.join(server.references_dir, genome.get_path("abundant_bowtie_index")),
-                    abundant_sam_file]
-            log_file = os.path.join(log_dir, "bowtie_abundant_seq_read%d.log" % (readnum+1))
+            logging.info("%s read%d" % (msg, readnum+1))
+            args = [pipeline.bowtie2_bin, "-p", num_processors, "--phred33",
+                    "--end-to-end", "--sensitive", "--reorder",
+                    "-x", os.path.join(server.references_dir, genome.get_path("abundant_bowtie_index")),
+                    "-U", lane.copied_fastq_files[readnum],
+                    "-S", abundant_sam_file]
+            log_file = os.path.join(log_dir, "bowtie2_abundant_seq_read%d.log" % (readnum+1))
             logging.debug("\targs: %s" % (' '.join(map(str, args))))
             job_id = submit_job_func("ab%d_%s" % (readnum+1, lane.id), args,
                                      num_processors=num_processors,
