@@ -130,7 +130,7 @@ def run_remote(analysis_file, config_file, server_name, num_processors,
                         retcode = remote_copy_file(local_file, remote_file, 
                                                    server.address, username, server.ssh_port, 
                                                    maxsize=remote_copy_max_size_bytes, 
-                                                   tmp_dir="/tmp")
+                                                   tmp_dir=local_tmp_dir)
                         if retcode != 0:
                             logging.error("Copy of read 1 failed")
                             # TODO: cleanup?
@@ -141,22 +141,24 @@ def run_remote(analysis_file, config_file, server_name, num_processors,
     #
     logging.info("Copying analysis XML file")
     remote_analysis_file = os.path.join(job_output_dir, config.REMOTE_ANALYSIS_XML_FILE)
-    analysis.to_xml("tmp_analysis.xml")
-    scp("tmp_analysis.xml", server.address + ":" + remote_analysis_file, server.ssh_port)
-    os.remove("tmp_analysis.xml")
+    local_analysis_file = os.path.join(local_tmp_dir,"tmp_analysis.xml")
+    analysis.to_xml(local_analysis_file)
+    scp(local_analysis_file, server.address + ":" + remote_analysis_file, server.ssh_port)
+    os.remove(local_analysis_file)
     #
     # copy configuration file to remote location
     #
     logging.info("Copying pipeline configuration XML file")
     remote_config_file = os.path.join(job_output_dir, config.REMOTE_CONFIG_XML_FILE)
-    pipeline.to_xml("tmp_pipeline_config.xml")
-    scp("tmp_pipeline_config.xml", server.address + ":" + remote_config_file, server.ssh_port)
-    os.remove("tmp_pipeline_config.xml")    
+    local_config_file = os.path.join(local_tmp_dir, "tmp_pipeline_config.xml")
+    pipeline.to_xml(local_config_file)
+    scp(local_config_file, server.address + ":" + remote_config_file, server.ssh_port)
+    os.remove(local_config_file)    
     #
     # package and copy source code to remote location
     #    
     logging.info("Packaging source code")
-    source_code_file = "tmp_oncoseq_code.tar.gz"
+    source_code_file = os.path.join(local_tmp_dir, "tmp_oncoseq_code.tar.gz")
     local_code_py_path = os.path.dirname(oncoseq.__path__[0])
     args = ["tar", "-C", local_code_py_path, "-zcvf", source_code_file, "oncoseq"]
     retcode = subprocess.call(args)

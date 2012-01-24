@@ -43,12 +43,18 @@ def main():
                 for f in lane.filtered_fastq_files:
                     if os.path.exists(f):
                         os.remove(f)
-                # remove abundant SAM/BAM files
+                # remove abundant SAM/BAM files (leave only the sorted BAM file)
                 for f in lane.abundant_sam_files:
                     if os.path.exists(f):
                         os.remove(f)
                 if os.path.exists(lane.abundant_bam_file):
                     os.remove(lane.abundant_bam_file)
+                # remote foreign contam SAM/BAM files (leave only the sorted BAM file)
+                for f in lane.xeno_sam_files:
+                    if os.path.exists(f):
+                        os.remove(f)
+                if os.path.exists(lane.xeno_bam_file):
+                    os.remove(lane.xeno_bam_file)                
                 # remove coverage bedgraph file
                 if os.path.exists(lane.coverage_bedgraph_file):
                     os.remove(lane.coverage_bedgraph_file)

@@ -158,7 +158,7 @@ def run_lane(lane, genome, server, pipeline, num_processors,
         log_file = os.path.join(log_dir, "picard_sort_abundant.log")
         logging.debug("\targs: %s" % (' '.join(map(str, args))))
         job_id = submit_job_func("sortsam_%s" % (lane.id), args,
-                                 num_processors=num_processors,
+                                 num_processors=1,
                                  node_processors=server.node_processors,
                                  node_memory=server.node_mem,
                                  pbs_script_lines=server.pbs_script_lines,
@@ -237,7 +237,7 @@ def run_lane(lane, genome, server, pipeline, num_processors,
         log_file = os.path.join(log_dir, "picard_sort_xeno.log")
         logging.debug("\targs: %s" % (' '.join(map(str, args))))
         job_id = submit_job_func("sortxeno_%s" % (lane.id), args,
-                                 num_processors=num_processors,
+                                 num_processors=1,
                                  node_processors=server.node_processors,
                                  node_memory=server.node_mem,
                                  pbs_script_lines=server.pbs_script_lines,

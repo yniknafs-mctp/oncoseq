@@ -147,7 +147,7 @@ def attach_sample_to_results(sample, root_dir):
             lane.xeno_sam_files = []
             for readnum in xrange(len(lane.copied_fastq_files)):
                 lane.xeno_sam_files.append(os.path.join(lane.output_dir, XENO_SAM_FILES[readnum]))
-            # contaminant foreign organism BAM file
+            # Contaminant foreign organism BAM files
             lane.xeno_bam_file = os.path.join(lane.output_dir, XENO_BAM_FILE)
             lane.sorted_xeno_bam_file = os.path.join(lane.output_dir, SORTED_XENO_BAM_FILE)
             # Fragment size distribution
