@@ -41,6 +41,12 @@ ABUNDANT_BAM_FILE = 'abundant_hits.bam'
 SORTED_ABUNDANT_BAM_FILE = 'abundant_hits.srt.bam'
 FILTERED_FASTQ_FILES = ('filtered_read1.fq', 'filtered_read2.fq')
 
+# contamination sequence mapping
+XENO_SAM_FILES = ('xeno_hits_read1.sam', 'xeno_hits_read2.sam')
+# filtered fastq files
+XENO_BAM_FILE = 'xeno_hits.bam'
+SORTED_XENO_BAM_FILE = 'xeno_hits.srt.bam'
+
 # fragment size distribution
 FRAG_SIZE_DIST_FILE = "frag_size_dist.txt"
 FRAG_SIZE_DIST_PLOT_FILE = "frag_size_dist_plot.pdf"
@@ -137,6 +143,13 @@ def attach_sample_to_results(sample, root_dir):
                 lane.filtered_fastq_files.append(os.path.join(lane.output_dir, FILTERED_FASTQ_FILES[readnum]))
             # Sorted abundant reads bam file
             lane.sorted_abundant_bam_file = os.path.join(lane.output_dir, SORTED_ABUNDANT_BAM_FILE)
+            # Contaminant foreign organism (xeno) SAM files
+            lane.xeno_sam_files = []
+            for readnum in xrange(len(lane.copied_fastq_files)):
+                lane.xeno_sam_files.append(os.path.join(lane.output_dir, XENO_SAM_FILES[readnum]))
+            # contaminant foreign organism BAM file
+            lane.xeno_bam_file = os.path.join(lane.output_dir, XENO_BAM_FILE)
+            lane.sorted_xeno_bam_file = os.path.join(lane.output_dir, SORTED_XENO_BAM_FILE)
             # Fragment size distribution
             lane.frag_size_dist_file = os.path.join(lane.output_dir, FRAG_SIZE_DIST_FILE)
             lane.frag_size_dist_plot_file = os.path.join(lane.output_dir, FRAG_SIZE_DIST_PLOT_FILE)
@@ -210,6 +223,10 @@ def validate_lane_results(lane):
     # check sorted abundant reads bam file
     if not check_sam_file(lane.sorted_abundant_bam_file, isbam=True):
         logging.error("Lane %s missing/corrupt abundant reads BAM file" % (lane.id))
+        is_valid = False
+    # check sorted foreign sequence bam file
+    if not check_sam_file(lane.sorted_xeno_bam_file, isbam=True):
+        logging.error("Lane %s missing/corrupt foreign sequences BAM file" % (lane.id))
         is_valid = False
     # check fragment size distribution
     if not check_frag_size_dist_file(lane.frag_size_dist_file):
@@ -341,20 +358,23 @@ class GenomeConfig(object):
     def from_xml_elem(elem):
         g = GenomeConfig()
         g.species = elem.get("name")
-        g.root_dir = elem.findtext("root_dir")
-        g.abundant_bowtie_index = elem.findtext("abundant_bowtie_index")
-        g.genome_bowtie_index = elem.findtext("genome_bowtie_index")
-        g.genome_fasta_file = elem.findtext("genome_fasta_file")
-        g.fragment_size_bowtie_index = elem.findtext("fragment_size_bowtie_index")
-        g.gene_annotation_refflat = elem.findtext("gene_annotation_refflat")
-        g.picard_ribosomal_intervals = elem.findtext("picard_ribosomal_intervals")        
-        g.chrom_sizes = elem.findtext("chrom_sizes")
+        for attrname in ("root_dir",
+                         "abundant_bowtie_index",
+                         "xeno_bowtie_index",
+                         "genome_bowtie_index",
+                         "genome_fasta_file",
+                         "fragment_size_bowtie_index",
+                         "gene_annotation_refflat",
+                         "picard_ribosomal_intervals",
+                         "chrom_sizes"):
+            setattr(g, attrname, elem.findtext(attrname))
         return g
 
     def to_xml(self, root):
         root.set("name", self.species)
         for attrname in ("root_dir",
                          "abundant_bowtie_index",
+                         "xeno_bowtie_index",
                          "genome_bowtie_index",
                          "genome_fasta_file",
                          "fragment_size_bowtie_index",
@@ -373,11 +393,14 @@ class GenomeConfig(object):
         if not os.path.exists(abs_root_dir):
             logging.error("genome root directory %s not found" % (self.root_dir))
             valid = False            
-        if not os.path.exists(os.path.join(abs_root_dir, self.abundant_bowtie_index + ".1.ebwt")):
-            logging.error("Abundant bowtie index %s not found" % (self.abundant_bowtie_index))
+        if not os.path.exists(os.path.join(abs_root_dir, self.abundant_bowtie_index + ".1.bt2")):
+            logging.error("Abundant bowtie2 index %s not found" % (self.abundant_bowtie_index))
             valid = False
         if not os.path.exists(os.path.join(abs_root_dir, self.abundant_bowtie_index + ".fa")):
             logging.error("Abundant sequences fasta file %s not found" % (self.abundant_bowtie_index))
+            valid = False
+        if not os.path.exists(os.path.join(abs_root_dir, self.xeno_bowtie_index + ".1.bt2")):
+            logging.error("Foreign contaminants bowtie2 index %s not found" % (self.xeno_bowtie_index))
             valid = False
         if not os.path.exists(os.path.join(abs_root_dir, self.genome_bowtie_index + ".1.ebwt")):
             logging.error("Genome bowtie index %s not found" % (self.genome_bowtie_index))

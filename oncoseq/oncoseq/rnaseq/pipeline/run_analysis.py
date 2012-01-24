@@ -83,7 +83,7 @@ def run_lane(lane, genome, server, pipeline, num_processors,
                                  deps=copy_fastq_deps,
                                  stderr_filename=log_file)
     #
-    # map reads against abundant sequences
+    # Map reads against abundant sequences
     #    
     msg = "Mapping reads against abundant sequences using bowtie2"
     abundant_mapping_deps = []
@@ -94,7 +94,7 @@ def run_lane(lane, genome, server, pipeline, num_processors,
         else:
             logging.info("%s read%d" % (msg, readnum+1))
             args = [pipeline.bowtie2_bin, "-p", num_processors, "--phred33",
-                    "--end-to-end", "--sensitive", "--reorder",
+                    "--end-to-end", "--sensitive", "--reorder", "-M", 200,
                     "-x", os.path.join(server.references_dir, genome.get_path("abundant_bowtie_index")),
                     "-U", lane.copied_fastq_files[readnum],
                     "-S", abundant_sam_file]
@@ -165,6 +165,85 @@ def run_lane(lane, genome, server, pipeline, num_processors,
                                  working_dir=lane.output_dir,
                                  walltime="10:00:00",
                                  deps=filtered_fastq_deps,
+                                 stderr_filename=log_file)
+    #
+    # Map reads against contaminant sequences
+    #    
+    msg = "Mapping reads against foreign contaminant sequences using bowtie2"
+    xeno_mapping_deps = []
+    for readnum in xrange(len(lane.filtered_fastq_files)):
+        xeno_sam_file = lane.xeno_sam_files[readnum]
+        if up_to_date(xeno_sam_file, lane.filtered_fastq_files[readnum]):
+            logging.info("[SKIPPED] %s read%d" % (msg, readnum+1))
+        else:
+            logging.info("%s read%d" % (msg, readnum+1))
+            args = [pipeline.bowtie2_bin, "-p", num_processors, "--phred33",
+                    "--end-to-end", "--sensitive", "--reorder", "-M", 200,
+                    "-x", os.path.join(server.references_dir, genome.get_path("xeno_bowtie_index")),
+                    "-U", lane.filtered_fastq_files[readnum],
+                    "-S", xeno_sam_file]
+            log_file = os.path.join(log_dir, "bowtie2_xeno_seq_read%d.log" % (readnum+1))
+            logging.debug("\targs: %s" % (' '.join(map(str, args))))
+            job_id = submit_job_func("xn%d_%s" % (readnum+1, lane.id), args,
+                                     num_processors=num_processors,
+                                     node_processors=server.node_processors,
+                                     node_memory=server.node_mem,
+                                     pbs_script_lines=server.pbs_script_lines,
+                                     working_dir=lane.output_dir,
+                                     walltime="20:00:00",
+                                     deps=filtered_fastq_deps,
+                                     stderr_filename=log_file)
+            xeno_mapping_deps.append(job_id)
+    #
+    # filter reads mapping to abundant sequences and output sequences 
+    # for tophat alignment
+    #
+    msg = "Filtering foreign contaminant sequences"
+    filter_xeno_deps = []
+    if all(up_to_date(lane.xeno_bam_file, f) for f in lane.xeno_sam_files):    
+        logging.info("[SKIPPED] %s" % (msg))
+    else:
+        logging.info("%s" % (msg))
+        args = [sys.executable, os.path.join(_pipeline_dir, "filter_unmapped_pairs.py"),
+                lane.xeno_bam_file]
+        args.extend(lane.xeno_sam_files)
+        log_file = os.path.join(log_dir, "filter_xeno_sequences.log")
+        logging.debug("\targs: %s" % (' '.join(map(str, args))))
+        job_id = submit_job_func("fxn_%s" % (lane.id), args,
+                                 num_processors=1,
+                                 node_processors=server.node_processors,
+                                 node_memory=server.node_mem,
+                                 pbs_script_lines=server.pbs_script_lines,
+                                 working_dir=lane.output_dir,
+                                 walltime="10:00:00",
+                                 deps=xeno_mapping_deps,
+                                 stderr_filename=log_file)
+        filter_xeno_deps = [job_id]
+    #
+    # sort foreign contaminants bam file
+    #
+    msg = "Sorting foreign contaminants BAM file"
+    if up_to_date(lane.sorted_xeno_bam_file, lane.xeno_bam_file):    
+        logging.info("[SKIPPED] %s" % msg)
+    else:
+        logging.info(msg)
+        args = ["java", "-jar", 
+                os.path.join(pipeline.picard_dir, "SortSam.jar"),
+                "INPUT=%s" % (lane.xeno_bam_file),
+                "OUTPUT=%s" % (lane.sorted_xeno_bam_file),
+                "SO=coordinate",
+                "CREATE_INDEX=true",
+                "TMP_DIR=%s" % tmp_dir]
+        log_file = os.path.join(log_dir, "picard_sort_xeno.log")
+        logging.debug("\targs: %s" % (' '.join(map(str, args))))
+        job_id = submit_job_func("sortxeno_%s" % (lane.id), args,
+                                 num_processors=num_processors,
+                                 node_processors=server.node_processors,
+                                 node_memory=server.node_mem,
+                                 pbs_script_lines=server.pbs_script_lines,
+                                 working_dir=lane.output_dir,
+                                 walltime="10:00:00",
+                                 deps=filter_xeno_deps,
                                  stderr_filename=log_file)
     #
     # determine the fragment size distribution of the reads
