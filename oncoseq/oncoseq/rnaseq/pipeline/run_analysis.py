@@ -533,7 +533,7 @@ def run_library(library, genome, server, pipeline, num_processors,
     #
     # call snps
     #
-    msg = "Calling SNVs"
+    msg = "Calling SNVs SAM"
     snv_deps = []
     if up_to_date(library.variant_vcf_file, library.merged_bam_file):
         logging.info("[SKIPPED] %s" % msg)
@@ -555,7 +555,37 @@ def run_library(library, genome, server, pipeline, num_processors,
                                  walltime="60:00:00",
                                  deps=merge_bam_deps,
                                  stderr_filename=log_file)
-        snv_deps = [job_id]        
+        snv_deps = [job_id]
+    
+    # 
+    # Call snps    
+    # Call SNVs using varscan
+    #
+    msg = "Calling SNVs VARS"
+    snv_vars_deps = []
+    if up_to_date(library.variant_vars_vcf_file, library.merged_bam_file):
+        logging.info("[SKIPPED] %s" % msg)
+    else:
+        logging.info(msg)
+        args = [sys.executable, os.path.join(_pipeline_dir, "call_snps_vars.py"),
+                os.path.join(server.references_dir, genome.get_path("genome_fasta_file")),
+                library.merged_bam_file,
+                library.variant_vars_bcf_file,
+                library.variant_vars_vcf_file]
+        log_file = os.path.join(log_dir, "varscan_snp_calling.log")
+        logging.debug("\targs: %s" % (' '.join(map(str, args))))
+        job_id = submit_job_func("snv_%s" % (library.id), args,
+                                 num_processors=1,
+                                 node_processors=server.node_processors,
+                                 node_memory=server.node_mem,
+                                 pbs_script_lines=server.pbs_script_lines,
+                                 working_dir=library.output_dir,
+                                 walltime="60:00:00",
+                                 deps=merge_bam_deps,
+                                 stderr_filename=log_file)
+        snv_vars_deps = [job_id]
+
+            
     #
     # run cufflinks to estimate transcript abundance of known genes
     #
@@ -598,7 +628,7 @@ def run_library(library, genome, server, pipeline, num_processors,
                                  deps=merge_bam_deps + merge_frag_size_deps,
                                  stderr_filename=log_file)
         cufflinks_deps = [job_id]
-    return cufflinks_deps + snv_deps
+    return cufflinks_deps + snv_deps + snv_vars_deps
 
 def run_sample(sample, genome, server, pipeline, num_processors,
                submit_job_func):

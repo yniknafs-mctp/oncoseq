@@ -13,6 +13,22 @@ from oncoseq.lib import config
 
 def call_snps(ref_fa, bam_file, bcf_file, vcf_file):
     # call snps and store in BCF file
+    '''
+    Varfilter default options:
+    Options: -Q INT    minimum RMS mapping quality for SNPs [10]
+         -d INT    minimum read depth [2]
+         -D INT    maximum read depth [10000000]
+         -a INT    minimum number of alternate bases [2]
+         -w INT    SNP within INT bp around a gap to be filtered [3]
+         -W INT    window size for filtering adjacent gaps [10]
+         -1 FLOAT  min P-value for strand bias (given PV4) [0.0001]
+         -2 FLOAT  min P-value for baseQ bias [1e-100]
+         -3 FLOAT  min P-value for mapQ bias [0]
+         -4 FLOAT  min P-value for end distance bias [0.0001]
+                 -e FLOAT  min P-value for HWE (plus F<0) [0.0001]
+         -p        print filtered variants
+    '''
+
     args = ["samtools", "mpileup", "-uf",
             ref_fa, bam_file]
     mpileup_p = subprocess.Popen(args, stdout=subprocess.PIPE)

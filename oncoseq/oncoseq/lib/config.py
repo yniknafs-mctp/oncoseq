@@ -78,6 +78,9 @@ MERGED_FRAG_SIZE_DIST_FILE = "merged_frag_size_dist.txt"
 # snp calling results
 VARIANT_BCF_FILE = "var.raw.bcf"
 VARIANT_VCF_FILE = "var.flt.vcf"
+VARS_VARIANT_SNV_FILE = "snvs.raw.vars"
+VARS_VARIANT_IND_FILE = "indels.raw.vars"
+
 
 # cufflinks output
 CUFFLINKS_DIR = "cufflinks"
@@ -112,6 +115,9 @@ def attach_sample_to_results(sample, root_dir):
         # SNP calling files
         library.variant_bcf_file = os.path.join(library.output_dir, VARIANT_BCF_FILE)
         library.variant_vcf_file = os.path.join(library.output_dir, VARIANT_VCF_FILE)
+        library.variant_vars_bcf_file = os.path.join(library.output_dir, VARS_VARIANT_SNV_FILE)
+        library.variant_vars_vcf_file = os.path.join(library.output_dir, VARS_VARIANT_IND_FILE)        
+        
         # Cufflinks output files
         library.cufflinks_dir = os.path.join(library.output_dir, CUFFLINKS_DIR)
         library.cufflinks_gtf_file = os.path.join(library.output_dir, CUFFLINKS_TRANSCRIPTS_GTF_FILE)
