@@ -13,10 +13,10 @@ import pysam
 from oncoseq.lib.sam import parse_reads_by_qname
 from oncoseq.lib.seq import DNA_reverse_complement
 
-def to_fastq(r, f):
+def to_fastq(r, readnum, f):
     seq = DNA_reverse_complement(r.seq) if r.is_reverse else r.seq
     qual = r.qual[::-1] if r.is_reverse else r.qual 
-    print >>f, "@%s\n%s\n+\n%s" % (r.qname, seq, qual)
+    print >>f, "@%s/%d\n%s\n+\n%s" % (r.qname, readnum, seq, qual)
 
 def filter_abundant_sequences(bam_file,
                               r1_input_file, 
@@ -49,7 +49,7 @@ def filter_abundant_sequences(bam_file,
                 pe_mapped_reads.append(mapped_reads)
             if all((len(mapped_reads) == 0) for mapped_reads in pe_mapped_reads):
                 for readnum, reads in enumerate(pe_reads):
-                    to_fastq(reads[0], fastq_files[readnum])            
+                    to_fastq(reads[0], readnum+1, fastq_files[readnum])            
             else:
                 for readnum,mapped_reads in enumerate(pe_mapped_reads):
                     if len(mapped_reads) == 0:

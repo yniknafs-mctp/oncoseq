@@ -39,7 +39,13 @@ ABUNDANT_SAM_FILES = ('abundant_hits_read1.sam', 'abundant_hits_read2.sam')
 # filtered fastq files
 ABUNDANT_BAM_FILE = 'abundant_hits.bam'
 SORTED_ABUNDANT_BAM_FILE = 'abundant_hits.srt.bam'
-FILTERED_FASTQ_FILES = ('filtered_read1.fq', 'filtered_read2.fq')
+FILTERED_FASTQ_PREFIX = 'filtered_read'
+FILTERED_FASTQ_FILES = tuple(("%s%d.fq" % (FILTERED_FASTQ_PREFIX,x)) for x in (1,2)) 
+
+# defuse gene fusion analysis
+DEFUSE_DIR = 'defuse'
+DEFUSE_RESULTS_FILE = 'results.classify.txt'
+DEFUSE_CONFIG_FILE = 'config.txt'
 
 # contamination sequence mapping
 XENO_SAM_FILES = ('xeno_hits_read1.sam', 'xeno_hits_read2.sam')
@@ -76,11 +82,10 @@ MERGED_BAM_FILE = "merged_alignments.bam"
 MERGED_FRAG_SIZE_DIST_FILE = "merged_frag_size_dist.txt"
 
 # snp calling results
-VARIANT_BCF_FILE = "var.raw.bcf"
-VARIANT_VCF_FILE = "var.flt.vcf"
-VARS_VARIANT_SNV_FILE = "snvs.raw.vars"
-VARS_VARIANT_IND_FILE = "indels.raw.vars"
-
+SAMTOOLS_VARIANT_BCF_FILE = "var.samtools.raw.bcf"
+SAMTOOLS_VARIANT_VCF_FILE = "var.samtools.flt.vcf"
+VARSCAN_VARIANT_SNV_FILE = "snvs.varscan.txt"
+VARSCAN_VARIANT_IND_FILE = "indels.varscan.txt"
 
 # cufflinks output
 CUFFLINKS_DIR = "cufflinks"
@@ -113,11 +118,10 @@ def attach_sample_to_results(sample, root_dir):
         # merged BAM file
         library.merged_bam_file = os.path.join(library.output_dir, MERGED_BAM_FILE)   
         # SNP calling files
-        library.variant_bcf_file = os.path.join(library.output_dir, VARIANT_BCF_FILE)
-        library.variant_vcf_file = os.path.join(library.output_dir, VARIANT_VCF_FILE)
-        library.variant_vars_bcf_file = os.path.join(library.output_dir, VARS_VARIANT_SNV_FILE)
-        library.variant_vars_vcf_file = os.path.join(library.output_dir, VARS_VARIANT_IND_FILE)        
-        
+        library.samtools_bcf_file = os.path.join(library.output_dir, SAMTOOLS_VARIANT_BCF_FILE)
+        library.samtools_vcf_file = os.path.join(library.output_dir, SAMTOOLS_VARIANT_VCF_FILE)
+        library.varscan_snv_file = os.path.join(library.output_dir, VARSCAN_VARIANT_SNV_FILE)
+        library.varscan_indel_file = os.path.join(library.output_dir, VARSCAN_VARIANT_IND_FILE)        
         # Cufflinks output files
         library.cufflinks_dir = os.path.join(library.output_dir, CUFFLINKS_DIR)
         library.cufflinks_gtf_file = os.path.join(library.output_dir, CUFFLINKS_TRANSCRIPTS_GTF_FILE)
@@ -147,6 +151,10 @@ def attach_sample_to_results(sample, root_dir):
             lane.filtered_fastq_files = []
             for readnum in xrange(len(lane.copied_fastq_files)):
                 lane.filtered_fastq_files.append(os.path.join(lane.output_dir, FILTERED_FASTQ_FILES[readnum]))
+            # defuse results
+            lane.defuse_dir = os.path.join(lane.output_dir, DEFUSE_DIR)
+            lane.defuse_config_file = os.path.join(lane.defuse_dir, DEFUSE_CONFIG_FILE)
+            lane.defuse_results_file = os.path.join(lane.defuse_dir, DEFUSE_RESULTS_FILE)
             # Sorted abundant reads bam file
             lane.sorted_abundant_bam_file = os.path.join(lane.output_dir, SORTED_ABUNDANT_BAM_FILE)
             # Contaminant foreign organism (xeno) SAM files
@@ -230,6 +238,10 @@ def validate_lane_results(lane):
     if not check_sam_file(lane.sorted_abundant_bam_file, isbam=True):
         logging.error("Lane %s missing/corrupt abundant reads BAM file" % (lane.id))
         is_valid = False
+    # check defuse results
+    if not file_exists_and_nz_size(lane.defuse_results_file):
+        logging.error("Lane %s missing/corrupt defuse results file" % (lane.id))
+        is_valid = False
     # check sorted foreign sequence bam file
     if not check_sam_file(lane.sorted_xeno_bam_file, isbam=True):
         logging.error("Lane %s missing/corrupt foreign sequences BAM file" % (lane.id))
@@ -286,9 +298,13 @@ def validate_library_results(library):
     if not file_exists_and_nz_size(library.cufflinks_gtf_file):
         logging.error("Library %s missing cufflinks gtf file" % (library.id))
         is_valid = False
-    # check snp files
-    if not file_exists_and_nz_size(library.variant_vcf_file):
-        logging.error("Library %s missing variant vcf file" % (library.id))
+    # check snp files from samtools
+    if not file_exists_and_nz_size(library.samtools_vcf_file):
+        logging.error("Library %s missing samtools variant vcf file" % (library.id))
+        is_valid = False
+    # check snp files from varascan
+    if not file_exists_and_nz_size(library.varscan_snv_file):
+        logging.error("Library %s missing varscan snv file" % (library.id))
         is_valid = False
     return is_valid
 
@@ -501,6 +517,72 @@ class ServerConfig(object):
             valid = False
         return valid    
 
+class DefuseConfig(object):    
+    path_params = {"gene_models": "",
+                   "genome_fasta": "",
+                   "repeats_filename": "",
+                   "est_fasta": "",
+                   "est_alignments": "",
+                   "unigene_fasta": "",
+                   "dataset_directory": ""}
+    params = {"clustering_precision": "0.95",
+              "span_count_threshold": "5",
+              "split_count_threshold": "3",
+              "percent_identity_threshold": "0.90",
+              "max_dist_pos": "600",
+              "num_dist_genes": "500",
+              "split_min_anchor": "4",
+              "max_concordant_ratio": "0.1",
+              "splice_bias": "10",
+              "denovo_assembly": "no",
+              "positive_controls": "$(data_directory)/controls.txt",
+              "probability_threshold": "0.50",
+              "covariance_sampling_density": "0.01",
+              "dna_concordant_length": "2000",
+              "discord_read_trim": "50"}
+
+    def __init__(self):
+        # check environment for location of source code
+        if "DEFUSEPATH" in os.environ:
+            self.source_dir = os.environ["DEFUSEPATH"]
+        else:
+            self.source_dir = ""
+        for k,v in DefuseConfig.path_params.iteritems():
+            setattr(self, k, v)
+        for k,v in DefuseConfig.params.iteritems():
+            setattr(self, k, v)
+
+    @staticmethod
+    def from_xml_elem(elem):
+        c = DefuseConfig()
+        for subelem in elem.iter():
+            setattr(c, subelem.tag, subelem.text)
+        return c
+    
+    def to_xml(self, root):
+        for attrname in DefuseConfig.path_params.iterkeys():
+            attrval = getattr(self,attrname)
+            if attrval is not None:
+                elem = etree.SubElement(root, attrname)
+                elem.text = str(attrval)
+        for attrname in DefuseConfig.params.iterkeys():
+            attrval = getattr(self,attrname)
+            if attrval is not None:
+                elem = etree.SubElement(root, attrname)
+                elem.text = str(attrval)
+    
+    def is_valid(self, species_dir):
+        valid = True
+        species_sub = lambda arg: arg.replace("${SPECIES}", species_dir)
+        # required paths
+        for attrname in DefuseConfig.path_params.iterkeys():
+            val = getattr(self, attrname)
+            newval = species_sub(val)
+            if not os.path.exists(newval):
+                logging.error("File not found: %s" % (newval))
+                valid = False
+        return valid
+
 class PipelineConfig(object):
     @staticmethod
     def from_xml(xmlfile):
@@ -515,6 +597,7 @@ class PipelineConfig(object):
         # binaries (hard-coded for now)
         c.fastqc_bin = "fastqc"
         c.samtools_bin = "samtools"
+        c.r_bin = "R"
         c.rscript_bin = "Rscript"
         c.bowtie_bin = "bowtie"
         c.bowtie2_bin = "bowtie2"
@@ -523,9 +606,12 @@ class PipelineConfig(object):
         c.bedtools_dir = ""
         c.ucsc_dir = ""
         c.picard_dir = ""
+        c.varscan_dir = ""
         # check environment
         if "PICARDPATH" in os.environ:
             c.picard_dir = os.environ["PICARDPATH"]
+        if "VARSCANPATH" in os.environ:
+            c.varscan_dir = os.environ["VARSCANPATH"]
         # default fragment size parameters
         c.fragment_size_mean_default = int(root.findtext("fragment_size_mean_default"))
         c.fragment_size_stdev_default = int(root.findtext("fragment_size_stdev_default"))
@@ -542,6 +628,8 @@ class PipelineConfig(object):
         elem = root.find("cufflinks")
         for arg_elem in elem.findall("arg"):
             c.cufflinks_args.append(arg_elem.text)
+        # defuse parameters
+        c.defuse_config = DefuseConfig.from_xml_elem(root.find("defuse"))
         # server setup
         c.servers = {}
         for elem in root.findall("server"):
@@ -579,6 +667,9 @@ class PipelineConfig(object):
         for arg in self.cufflinks_args:
             elem = etree.SubElement(cufflinks_elem, "arg")
             elem.text = arg
+        # defuse parameters
+        defuse_elem = etree.SubElement(root, "defuse")
+        self.defuse_config.to_xml(defuse_elem)
         # servers
         for server in self.servers.itervalues():            
             elem = etree.SubElement(root, "server")
@@ -594,16 +685,35 @@ class PipelineConfig(object):
         print >>f, etree.tostring(root)
         f.close() 
 
-    def is_valid(self, server_name):
+    def is_valid(self, server_name, species_name):
         """
         ensure configuration is valid
         """
         valid = True
+        # check server
+        if server_name not in self.servers:
+            logging.error("Server %s not found" % (server_name))
+            return False
         server = self.servers[server_name]
-        # check directories
         if not server.is_valid():
             logging.error("Server %s missing required paths" % (server_name))
             valid = False
+        # check genome
+        if species_name not in self.species:
+            logging.error("Genome %s not found" % (species_name))
+            return False
+        genome = self.species[species_name]
+        if not genome.is_valid(server.references_dir):
+            logging.error("Genome %s missing required files" % (species_name))
+            valid = False
+        # check defuse config
+        species_dir = os.path.join(server.references_dir, genome.root_dir)
+        if not self.defuse_config.is_valid(species_dir):
+            logging.error("Defuse missing required files")
+            valid = False
+        #
+        # Check software installation
+        #
         # check fastqc
         msg = 'fastqc'
         if check_executable(self.fastqc_bin):
@@ -632,7 +742,20 @@ class PipelineConfig(object):
         else:
             logging.error("Picard jarfile '%s' not found" % (jarfile))
             valid = False
+        # varscan
+        jarfile = os.path.join(self.varscan_dir, "varscan")
+        if os.path.exists(jarfile):
+            logging.debug("Checking for varscan... found")
+        else:
+            logging.error("varscan jarfile '%s' not found" % (jarfile))
+            valid = False
         # check R
+        msg = 'R'
+        if check_executable(self.r_bin):
+            logging.debug("Checking for '%s' binary... found" % msg)
+        else:
+            logging.error("'%s' binary not found or not executable" % msg)
+            valid = False
         msg = 'Rscript'
         if check_executable(self.rscript_bin):
             logging.debug("Checking for '%s' binary... found" % msg)
@@ -670,18 +793,25 @@ class PipelineConfig(object):
         else:
             logging.error("'%s' binary not found or not executable" % msg)
             valid = False            
-        # check UCSC
-        msg = 'UCSC'
+        # check UCSC binaries
+        msg = 'UCSC bedGraphToBigWig'
         if check_executable(os.path.join(self.ucsc_dir, "bedGraphToBigWig")):
             logging.debug("Checking for '%s' binaries... found" % msg)
         else:
             logging.error("'%s' binaries not found or not executable" % msg)
             valid = False
-        # check genomes
-        for species,g in self.species.iteritems():
-            if not g.is_valid(server.references_dir):
-                logging.error("Genome '%s' missing required files" % (species))
-                valid = False
+        msg = 'UCSC blat'
+        if check_executable(os.path.join(self.ucsc_dir, "blat")):
+            logging.debug("Checking for '%s' binaries... found" % msg)
+        else:
+            logging.error("'%s' binaries not found or not executable" % msg)
+            valid = False
+        msg = 'UCSC faToTwoBit'
+        if check_executable(os.path.join(self.ucsc_dir, "faToTwoBit")):
+            logging.debug("Checking for '%s' binaries... found" % msg)
+        else:
+            logging.error("'%s' binaries not found or not executable" % msg)
+            valid = False
         # check for bx python library
         try:
             import bx.intervals.intersection

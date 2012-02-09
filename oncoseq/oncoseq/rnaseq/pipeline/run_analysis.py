@@ -12,6 +12,7 @@ from oncoseq.lib import config
 from oncoseq.lib.config import AnalysisConfig, PipelineConfig
 from oncoseq.lib.cluster import submit_job_pbs, submit_job_nopbs
 from oncoseq.lib.base import up_to_date
+from oncoseq.lib.defuse import get_defuse_config_string
 
 # setup pipeline script files
 import oncoseq.rnaseq.pipeline
@@ -140,6 +141,48 @@ def run_lane(lane, genome, server, pipeline, num_processors,
                                  deps=abundant_mapping_deps,
                                  stderr_filename=log_file)
         filtered_fastq_deps = [job_id]
+
+    #
+    # run defuse gene fusion prediction
+    #
+    msg = "Running DeFuse gene fusion prediction"
+    if all(up_to_date(lane.defuse_results_file,f) for f in lane.filtered_fastq_files):
+        logging.info("[SKIPPED] %s" % (msg))
+    else:
+        logging.info("%s" % (msg))
+        if not os.path.exists(lane.defuse_dir):
+            logging.info("\tcreating directory: %s" % (lane.defuse_dir))
+            os.makedirs(lane.defuse_dir)
+        defuse_config = pipeline.defuse_config
+        species_root_dir = os.path.join(server.references_dir, genome.root_dir) 
+        # write defuse config file
+        config_str = get_defuse_config_string(species_root_dir, 
+                                              defuse_config,
+                                              max_fragment_size=pipeline.max_fragment_size,
+                                              num_processors=num_processors)
+        f = open(lane.defuse_config_file, "w")
+        f.write(config_str)
+        f.close()
+        # setup command line
+        script = os.path.join(defuse_config.source_dir, "scripts", "defuse.pl")
+        args = [script, "-c", lane.defuse_config_file, "-d", lane.output_dir,
+                "-o", lane.defuse_dir, "-p", num_processors] 
+        logging.debug("\targs: %s" % (' '.join(map(str, args))))
+        log_stderr_file = os.path.join(log_dir, "defuse_stderr.log")
+        log_stdout_file = os.path.join(log_dir, "defuse_stdout.log")
+        # allocate 12gb to run defuse
+        defuse_pmem = int(round(float(12000.0 / num_processors),0))
+        job_id = submit_job_func("defuse_%s" % (lane.id), args,
+                                 num_processors=num_processors,
+                                 node_processors=server.node_processors,
+                                 node_memory=server.node_mem,
+                                 pbs_script_lines=server.pbs_script_lines,
+                                 working_dir=lane.output_dir,
+                                 pmem=defuse_pmem,
+                                 walltime="80:00:00",
+                                 deps=filtered_fastq_deps,
+                                 stdout_filename=log_stdout_file,
+                                 stderr_filename=log_stderr_file)
     #
     # sort abundant reads bam file
     #
@@ -163,6 +206,7 @@ def run_lane(lane, genome, server, pipeline, num_processors,
                                  node_memory=server.node_mem,
                                  pbs_script_lines=server.pbs_script_lines,
                                  working_dir=lane.output_dir,
+                                 pmem=8192,
                                  walltime="10:00:00",
                                  deps=filtered_fastq_deps,
                                  stderr_filename=log_file)
@@ -533,8 +577,8 @@ def run_library(library, genome, server, pipeline, num_processors,
     #
     # call snps
     #
-    msg = "Calling SNVs SAM"
-    snv_deps = []
+    msg = "Calling SNVs with samtools"
+    samtools_snv_deps = []
     if up_to_date(library.variant_vcf_file, library.merged_bam_file):
         logging.info("[SKIPPED] %s" % msg)
     else:
@@ -546,7 +590,7 @@ def run_library(library, genome, server, pipeline, num_processors,
                 library.variant_vcf_file]
         log_file = os.path.join(log_dir, "samtools_snp_calling.log")
         logging.debug("\targs: %s" % (' '.join(map(str, args))))
-        job_id = submit_job_func("snv_%s" % (library.id), args,
+        job_id = submit_job_func("samsnv_%s" % (library.id), args,
                                  num_processors=1,
                                  node_processors=server.node_processors,
                                  node_memory=server.node_mem,
@@ -555,26 +599,26 @@ def run_library(library, genome, server, pipeline, num_processors,
                                  walltime="60:00:00",
                                  deps=merge_bam_deps,
                                  stderr_filename=log_file)
-        snv_deps = [job_id]
-    
+        samtools_snv_deps = [job_id]    
     # 
-    # Call snps    
     # Call SNVs using varscan
     #
-    msg = "Calling SNVs VARS"
-    snv_vars_deps = []
-    if up_to_date(library.variant_vars_vcf_file, library.merged_bam_file):
+    msg = "Calling SNVs with VarScan"
+    varscan_deps = []
+    if up_to_date(library.varscan_snv_file, library.merged_bam_file):
         logging.info("[SKIPPED] %s" % msg)
     else:
         logging.info(msg)
-        args = [sys.executable, os.path.join(_pipeline_dir, "call_snps_vars.py"),
+        args = [sys.executable, os.path.join(_pipeline_dir, "call_snps_varscan.py"),
+                "--varscan-dir", pipeline.varscan_dir,
                 os.path.join(server.references_dir, genome.get_path("genome_fasta_file")),
                 library.merged_bam_file,
-                library.variant_vars_bcf_file,
-                library.variant_vars_vcf_file]
-        log_file = os.path.join(log_dir, "varscan_snp_calling.log")
+                library.varscan_snv_file,
+                library.varscan_indel_file]
+        log_stdout_file = os.path.join(log_dir, "varscan_snp_calling_stdout.log")
+        log_stderr_file = os.path.join(log_dir, "varscan_snp_calling_stderr.log")
         logging.debug("\targs: %s" % (' '.join(map(str, args))))
-        job_id = submit_job_func("snv_%s" % (library.id), args,
+        job_id = submit_job_func("varscan_%s" % (library.id), args,
                                  num_processors=1,
                                  node_processors=server.node_processors,
                                  node_memory=server.node_mem,
@@ -582,10 +626,9 @@ def run_library(library, genome, server, pipeline, num_processors,
                                  working_dir=library.output_dir,
                                  walltime="60:00:00",
                                  deps=merge_bam_deps,
-                                 stderr_filename=log_file)
-        snv_vars_deps = [job_id]
-
-            
+                                 stdout_filename=log_stdout_file,
+                                 stderr_filename=log_stderr_file)
+        varscan_deps = [job_id]
     #
     # run cufflinks to estimate transcript abundance of known genes
     #
@@ -628,7 +671,7 @@ def run_library(library, genome, server, pipeline, num_processors,
                                  deps=merge_bam_deps + merge_frag_size_deps,
                                  stderr_filename=log_file)
         cufflinks_deps = [job_id]
-    return cufflinks_deps + snv_deps + snv_vars_deps
+    return cufflinks_deps + samtools_snv_deps + varscan_deps
 
 def run_sample(sample, genome, server, pipeline, num_processors,
                submit_job_func):
@@ -656,6 +699,15 @@ def run_analysis(analysis_file, config_file, server_name,
     #
     analysis = AnalysisConfig.from_xml(analysis_file)
     pipeline = PipelineConfig.from_xml(config_file)
+    #
+    # validate configuration files
+    #
+    if not analysis.is_valid():
+        logging.error("Analysis config not valid")
+        return config.JOB_ERROR
+    if not pipeline.is_valid(server_name, analysis.species):
+        logging.error("Pipeline config not valid")
+        return config.JOB_ERROR
     # setup server
     server = pipeline.servers[server_name]
     if server.pbs:
@@ -664,15 +716,6 @@ def run_analysis(analysis_file, config_file, server_name,
         submit_job_func = submit_job_nopbs
     # setup genome references
     genome = pipeline.species[analysis.species]
-    #
-    # validate configuration files
-    #
-    if not analysis.is_valid():
-        logging.error("Analysis config not valid")
-        return config.JOB_ERROR
-    if not pipeline.is_valid(server_name):
-        logging.error("Pipeline config not valid")
-        return config.JOB_ERROR
     #
     # attach analysis to pipeline output directory
     #
