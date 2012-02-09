@@ -52,20 +52,18 @@ def call_snps(ref_fa, bam_file,
         if os.path.exists(varscan_snv_file):
             os.remove(varscan_snv_file)
         return config.JOB_ERROR
-    #
     # Convert the VarScan output file to VCF format
-    # 
     convert_varscan_to_vcf(varscan_snv_file, varscan_snv_file + '.vcf')
     #
     # Call Indels using varscan
     #
-    args = ["java","-jar",os.path.join("$VARSCANPATH","varscan"),"mpileup2indel",mpileup_t,
-            "--variants", "1", 
+    args = ["java","-jar", os.path.join(varscan_dir, "varscan"),
+            "mpileup2indel", mpileup_t, "--variants", "1", 
             "--p-value", str(dpval)]
     #,'>',indels_vcf_file] #"--output-vcf",str(1) for output in vcf format
     cmd = " ".join(map(str,args))
     logging.debug("VarScan indel args: %s" % (cmd))
-    f = open(varscan_indel_file,'w')
+    f = open(varscan_indel_file, 'w')
     retcode = subprocess.call(cmd, stdout=f,shell=True)
     f.close()
     if retcode != 0:
