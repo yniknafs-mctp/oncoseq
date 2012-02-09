@@ -579,15 +579,15 @@ def run_library(library, genome, server, pipeline, num_processors,
     #
     msg = "Calling SNVs with samtools"
     samtools_snv_deps = []
-    if up_to_date(library.variant_vcf_file, library.merged_bam_file):
+    if up_to_date(library.samtools_vcf_file, library.merged_bam_file):
         logging.info("[SKIPPED] %s" % msg)
     else:
         logging.info(msg)
         args = [sys.executable, os.path.join(_pipeline_dir, "call_snps.py"),
                 os.path.join(server.references_dir, genome.get_path("genome_fasta_file")),
                 library.merged_bam_file,
-                library.variant_bcf_file,
-                library.variant_vcf_file]
+                library.samtools_bcf_file,
+                library.samtools_vcf_file]
         log_file = os.path.join(log_dir, "samtools_snp_calling.log")
         logging.debug("\targs: %s" % (' '.join(map(str, args))))
         job_id = submit_job_func("samsnv_%s" % (library.id), args,
