@@ -74,7 +74,6 @@ def call_snps(ref_fa, bam_file, snps_vcf_file, indels_vcf_file,
         os.remove(mpileup_t)
     return config.JOB_SUCCESS
 
-
 def main():
     logging.basicConfig(level=logging.DEBUG,
                         format="%(asctime)s - %(name)s - %(levelname)s - %(message)s")
@@ -88,7 +87,6 @@ def main():
     return call_snps(args.ref_fa, args.bam_file, 
                      args.snv_file, args.indel_file,
                      varscan_dir=args.varscan_dir)
-
 
 if __name__ == '__main__': 
     sys.exit(main())
