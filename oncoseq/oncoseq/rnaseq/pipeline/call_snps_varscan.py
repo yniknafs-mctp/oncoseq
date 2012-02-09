@@ -10,9 +10,11 @@ import sys
 import os
 
 from oncoseq.lib import config
-from oncoseq.lib.vs2vcf import read_file
+from oncoseq.lib.vs2vcf import convert_varscan_to_vcf
 
-def call_snps(ref_fa, bam_file, snps_vcf_file, indels_vcf_file,
+def call_snps(ref_fa, bam_file, 
+              varscan_snv_file, 
+              varscan_indel_file,
               varscan_dir):
     #
     # Use samtools mpileup to create a BCF file of snps
@@ -42,16 +44,18 @@ def call_snps(ref_fa, bam_file, snps_vcf_file, indels_vcf_file,
             "--p-value", str(dpval)]
     cmd = " ".join(map(str,args))
     logging.debug("VarScan args: %s" % (cmd))
-    f = open(snps_vcf_file, 'w')
+    f = open(varscan_snv_file, 'w')
     retcode = subprocess.call(cmd, stdout=f, shell=True)
     f.close()
     if retcode != 0:
         logging.error("VarScan SNV calling failed")
-        if os.path.exists(snps_vcf_file):
-            os.remove(snps_vcf_file)
+        if os.path.exists(varscan_snv_file):
+            os.remove(varscan_snv_file)
         return config.JOB_ERROR
-    else:
-        read_file(snps_vcf_file,snps_vcf_file+'.vcf')
+    #
+    # Convert the VarScan output file to VCF format
+    # 
+    convert_varscan_to_vcf(varscan_snv_file, varscan_snv_file + '.vcf')
     #
     # Call Indels using varscan
     #
@@ -61,13 +65,13 @@ def call_snps(ref_fa, bam_file, snps_vcf_file, indels_vcf_file,
     #,'>',indels_vcf_file] #"--output-vcf",str(1) for output in vcf format
     cmd = " ".join(map(str,args))
     logging.debug("VarScan indel args: %s" % (cmd))
-    f = open(indels_vcf_file,'w')
+    f = open(varscan_indel_file,'w')
     retcode = subprocess.call(cmd, stdout=f,shell=True)
     f.close()
     if retcode != 0:
         logging.error("VarScan Indel calling failed")
-        if os.path.exists(indels_vcf_file):
-            os.remove(indels_vcf_file)
+        if os.path.exists(varscan_indel_file):
+            os.remove(varscan_indel_file)
         return config.JOB_ERROR
     # remove intermediate files
     if os.path.exists(mpileup_t):

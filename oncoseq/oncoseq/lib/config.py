@@ -82,10 +82,10 @@ MERGED_BAM_FILE = "merged_alignments.bam"
 MERGED_FRAG_SIZE_DIST_FILE = "merged_frag_size_dist.txt"
 
 # snp calling results
-SAMTOOLS_VARIANT_BCF_FILE = "var.samtools.raw.bcf"
-SAMTOOLS_VARIANT_VCF_FILE = "var.samtools.flt.vcf"
-VARSCAN_VARIANT_SNV_FILE = "snvs.varscan.txt"
-VARSCAN_VARIANT_IND_FILE = "indels.varscan.txt"
+SAMTOOLS_VARIANT_BCF_FILE = "samtools.var.raw.bcf"
+SAMTOOLS_VARIANT_VCF_FILE = "samtools.var.flt.vcf"
+VARSCAN_VARIANT_SNV_FILE = "varscan.snvs.txt"
+VARSCAN_VARIANT_IND_FILE = "varscan.indels.txt"
 
 # cufflinks output
 CUFFLINKS_DIR = "cufflinks"

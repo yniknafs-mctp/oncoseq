@@ -8,7 +8,6 @@ import argparse
 import numpy as np
 from collections import defaultdict
 
-
 def vcf_header():
     '''
     ##fileformat=VCFv4.0
@@ -30,8 +29,8 @@ def vcf_header():
     ##INFO=<ID=DS,Number=0,Type=Flag,Description="Were any of the samples downsampled?">
     ##INFO=<ID=Dels,Number=1,Type=Float,Description="Fraction of Reads Containing Spanning Deletions">
     '''
-    header=['##fileformat=VCFv4.0','#CHROM\tPOS\tID\tREF\tALT\tQUAL\tFILTER\tINFO\tFORMAT\tSAMPLE']
-    
+    header = ['##fileformat=VCFv4.0',
+              '#CHROM\tPOS\tID\tREF\tALT\tQUAL\tFILTER\tINFO\tFORMAT\tSAMPLE']
     return header
 
 def read_line(l, fdict,SB_dict):
@@ -66,60 +65,60 @@ def print_line(fdict,fields):
     
     return mf
 
-
-def read_file(ifile,ofile):
+def convert_varscan_to_vcf(ifile, ofile):
     '''
     Reads the output of varscan snps
     and prints a file in the vcf format
     For exact meaning of the fields see 
     http://varscan.sourceforge.net/using-varscan.html
     '''
+    # prepare input/output files
     ifile = open(ifile)
-    ofile=open(ofile,'w')
     header = ifile.next()
-    
-    MAPPING_QUAL=20
+    logging.debug("Input file header: %s" % (header))
+    ofile = open(ofile, 'w')
+    # constants      
+    MAPPING_QUAL = 20
     MIN_QUAL=30
-    print header
-    '''
-    fdict={'CHROM':0,'POS':1,'REF':2,'ALT':3,'DP':5,'DPREF':6,
-       'DPALT':7, 'AF':8,'QUAL':9, 'SB':10,'SBREF_Plus':11,
-       'SBREF_Minus':12,'SBALT_Plus':13,'SBALT_Minus':14, 'AA':4} 
-    '''
-    fdict={'CHROM':0,'POS':1,'REF':2,'ALT':3,'DP':5,'DPREF':6,
-       'DPALT':7, 'AF':8,'QUAL':9,'AA':4}#, 'SB':10,'SBREF_Plus':11,'SBREF_Minus':12,'SBALT_Plus':13,'SBALT_Minus':14, 'AA':4} 
-    SB_dict={'SB':5}
-
-    ofile.write( ",".join(vcf_header()).replace(',','\n')+'\n')
-    i=0
+    # setup a dictionaries mapping varscan column positions to VCF 
+    # column positions
+    # fdict={'CHROM':0,'POS':1,'REF':2,'ALT':3,'DP':5,'DPREF':6,
+    #   'DPALT':7, 'AF':8,'QUAL':9, 'SB':10,'SBREF_Plus':11,
+    #   'SBREF_Minus':12,'SBALT_Plus':13,'SBALT_Minus':14, 'AA':4} 
+    fdict = {'CHROM':0,'POS':1,'REF':2,'ALT':3,'DP':5,'DPREF':6,
+             'DPALT':7, 'AF':8,'QUAL':9,'AA':4 } 
+    #, 'SB':10,'SBREF_Plus':11,'SBREF_Minus':12,'SBALT_Plus':13,'SBALT_Minus':14, 'AA':4} 
+    SB_dict = {'SB': 5}
+    # write VCF header to output file
+    ofile.write("\n".join(vcf_header()) + '\n')
     for l in ifile:
-        #if i < 10:
-        fields = read_line(l, fdict,SB_dict)
-        if fields['QUAL']== '0.4999chr6':
-            print fields
-            continue
-        # Convert varscan probability to score as SamTools or gatk. Not CAP at 255
-        fields['QUAL']= str(np.around(-10 * np.log10(float(fields['QUAL'])),decimals=2)) 
+        fields = read_line(l, fdict, SB_dict)
+        # debugging code
+        #if fields['QUAL']== '0.4999chr6':
+        #    print fields
+        #    continue
+        # convert varscan probability to score as SamTools or gatk. Not CAP at 255
+        # TODO: fix divide by zero warning here
+        fields['QUAL'] = str(np.around(-10 * np.log10(float(fields['QUAL'])),decimals=2)) 
         #fields['DP']=str(int(fields['DPREF'])+int(fields['DPALT']))
         #fields['MQ']=str(min(int(fields['MQREF']),fields['MQALT']))
         #fields['SB']=str(round(min(float(fields['SBREF_Plus'])/(float(fields['SBREF_Minus'])+1),
         #                 float(fields['SBALT_Plus'])/(float(fields['SBALT_Minus'])+1)),2) )
-        fields['AF']=str(float(fields['AF'].replace('%',''))/100.0)
-        fields['FILTER']='PASS' if float(fields['QUAL']) >= MIN_QUAL else 'LowQual'
-        fields['ID']='.'#fields['CHROM']+'@'+fields['POS']
-        fake_sample='\tGT:AD:DP:GL:GQ\t0/0:0,0:0:0,0,0:0'
+        fields['AF'] = str(float(fields['AF'].replace('%',''))/100.0)
+        fields['FILTER'] = 'PASS' if float(fields['QUAL']) >= MIN_QUAL else 'LowQual'
+        fields['ID'] = '.' #fields['CHROM']+'@'+fields['POS']
+        fake_sample = '\tGT:AD:DP:GL:GQ\t0/0:0,0:0:0,0,0:0'
         #if float(fields['MQREF']) >= MAPPING_QUAL and float(fields['MQALT']) >= MAPPING_QUAL:
-        ofile.write( ",".join(print_line(fdict,fields)).replace(',','\t')+fake_sample+'\n')
-
+        ofile.write("\t".join(print_line(fdict, fields)) + fake_sample + '\n')
 
 def main():
     logging.basicConfig(level=logging.DEBUG,
                         format="%(asctime)s - %(name)s - %(levelname)s - %(message)s")
     parser = argparse.ArgumentParser()
-    parser.add_argument("snvs_vars_file")
-    parser.add_argument("snvs_vcf_file")
+    parser.add_argument("varscan_input_file")
+    parser.add_argument("vcf_output_file")
     args = parser.parse_args()    
-    return read_file(args.snvs_vars_file, args.snvs_vcf_file)
+    return convert_varscan_to_vcf(args.varscan_input_file, args.vcf_output_file)
 
 
 if __name__ == '__main__': 
