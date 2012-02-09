@@ -238,8 +238,9 @@ def validate_lane_results(lane):
     if not check_sam_file(lane.sorted_abundant_bam_file, isbam=True):
         logging.error("Lane %s missing/corrupt abundant reads BAM file" % (lane.id))
         is_valid = False
-    # check defuse results
-    if not file_exists_and_nz_size(lane.defuse_results_file):
+    # check defuse results (only run defuse for paired-end reads)    
+    if ((len(lane.filtered_fastq_files) > 1) and    
+        (not file_exists_and_nz_size(lane.defuse_results_file))):
         logging.error("Lane %s missing/corrupt defuse results file" % (lane.id))
         is_valid = False
     # check sorted foreign sequence bam file
