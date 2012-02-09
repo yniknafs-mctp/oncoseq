@@ -170,8 +170,8 @@ def run_lane(lane, genome, server, pipeline, num_processors,
             logging.debug("\targs: %s" % (' '.join(map(str, args))))
             log_stderr_file = os.path.join(log_dir, "defuse_stderr.log")
             log_stdout_file = os.path.join(log_dir, "defuse_stdout.log")
-            # allocate 12gb to run defuse
-            defuse_pmem = int(round(float(12000.0 / num_processors),0))
+            # allocate 24gb to run defuse
+            defuse_pmem = int(round(float(24000.0 / num_processors),0))
             job_id = submit_job_func("defuse_%s" % (lane.id), args,
                                      num_processors=num_processors,
                                      node_processors=server.node_processors,
