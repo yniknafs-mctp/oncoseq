@@ -144,6 +144,7 @@ def run_lane(lane, genome, server, pipeline, num_processors,
     #
     # Run defuse gene fusion prediction for paired-end lanes
     #
+    defuse_deps = []
     if len(lane.filtered_fastq_files) > 1:
         msg = "Running DeFuse gene fusion predictor"
         if all(up_to_date(lane.defuse_results_file,f) for f in lane.filtered_fastq_files):
@@ -183,6 +184,7 @@ def run_lane(lane, genome, server, pipeline, num_processors,
                                      deps=filtered_fastq_deps,
                                      stdout_filename=log_stdout_file,
                                      stderr_filename=log_stderr_file)
+            defuse_deps = [job_id]
     else:
         logging.info("[SKIPPED] Cannot run DeFuse gene fusion predictor on single-end reads")
     #
@@ -464,6 +466,7 @@ def run_lane(lane, genome, server, pipeline, num_processors,
     # convert bedgraph to bigwig coverage file
     #
     msg = "Create bigWig file to display coverage"
+    bigwig_deps = []
     if (up_to_date(lane.coverage_bigwig_file, lane.coverage_bedgraph_file)):
         logging.info("[SKIPPED] %s" % (msg))
     else:
@@ -482,7 +485,8 @@ def run_lane(lane, genome, server, pipeline, num_processors,
                                  walltime="20:00:00",
                                  deps=bedgraph_deps,
                                  stderr_filename=log_file)
-    return tophat_deps
+        bigwig_deps = [job_id]
+    return tophat_deps + defuse_deps + bigwig_deps
 
 
 def run_library(library, genome, server, pipeline, num_processors,
