@@ -102,6 +102,31 @@ def remote_copy_file(src, dst, remote_address, username, port, maxsize=(8<<30), 
         logging.debug("\tremote file size of %d bytes matches local file size" % (src_file_size))
     return 0
 
+def globus_copy_file(src, dst, remote_address, username, port):
+    #
+    # I don't know what path format src and dst are in,
+    # but they need to be full paths for this
+    #
+    # Since this isn't technically a remote address (goofy hashtag endpoint) I hardcoded it in
+    #
+    # As a placeholder until terry adds globus to exds, I put in my credentials on my box -
+    #  let me know if you want to test it
+    #
+    # the port is default (22 i think)
+    # 
+    #
+    logging.debug("Copying files")
+    user = "user"
+    host = "cli.globusonline.org"
+    tx_src  = "user#endpointname"
+    tx_dest = "umich#nyx"
+    
+    args = ["ssh",user + "@" + host,"scp",tx_src + ":" + src,tx_dest + ":" + src];
+    retcode = subprocess.call(args)        
+    if retcode != 0:
+        return JOB_ERROR  
+    
+    return 0
 
 def submit_job_pbs(job_name, 
                    args,
