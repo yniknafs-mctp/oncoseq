@@ -486,12 +486,13 @@ def run_lane(lane, genome, server, pipeline, num_processors,
                                  deps=bedgraph_deps,
                                  stderr_filename=log_file)
         bigwig_deps = [job_id]
-    return tophat_deps + defuse_deps + bigwig_deps
+    return tophat_deps, tophat_deps + defuse_deps + bigwig_deps
 
 
 def run_library(library, genome, server, pipeline, num_processors,
                 submit_job_func):
-    lane_deps = []
+    merge_lane_deps = []
+    all_lane_deps = []
     has_paired_end = False
     frag_size_dist_files = []
     for lane in library.lanes:
@@ -505,7 +506,9 @@ def run_library(library, genome, server, pipeline, num_processors,
         #
         # process lane
         #
-        lane_deps.extend(run_lane(lane, genome, server, pipeline, num_processors, submit_job_func))
+        tophat_deps, lane_deps = run_lane(lane, genome, server, pipeline, num_processors, submit_job_func)
+        merge_lane_deps.extend(tophat_deps)
+        all_lane_deps.extend(lane_deps)
         #
         # keep track of whether we have paired end
         #
@@ -546,7 +549,7 @@ def run_library(library, genome, server, pipeline, num_processors,
                                  pbs_script_lines=server.pbs_script_lines,
                                  working_dir=library.output_dir,
                                  walltime="10:00:00",
-                                 deps=lane_deps,
+                                 deps=merge_lane_deps,
                                  stderr_filename=log_file)
         merge_frag_size_deps = [job_id]
     #
@@ -577,7 +580,7 @@ def run_library(library, genome, server, pipeline, num_processors,
                                  pbs_script_lines=server.pbs_script_lines,
                                  working_dir=library.output_dir,
                                  walltime="20:00:00",
-                                 deps=lane_deps,
+                                 deps=merge_lane_deps,
                                  stderr_filename=log_file)
         merge_bam_deps = [job_id]
     #
@@ -677,7 +680,8 @@ def run_library(library, genome, server, pipeline, num_processors,
                                  deps=merge_bam_deps + merge_frag_size_deps,
                                  stderr_filename=log_file)
         cufflinks_deps = [job_id]
-    return cufflinks_deps + samtools_snv_deps + varscan_deps
+    lib_deps = cufflinks_deps + samtools_snv_deps + varscan_deps
+    return lib_deps + all_lane_deps
 
 def run_sample(sample, genome, server, pipeline, num_processors,
                submit_job_func):
