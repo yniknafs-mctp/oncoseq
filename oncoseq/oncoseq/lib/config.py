@@ -42,15 +42,6 @@ SORTED_ABUNDANT_BAM_FILE = 'abundant_hits.srt.bam'
 FILTERED_FASTQ_PREFIX = 'filtered_read'
 FILTERED_FASTQ_FILES = tuple(("%s%d.fq" % (FILTERED_FASTQ_PREFIX,x)) for x in (1,2)) 
 
-# chimerascan gene fusion analysis
-CHIMERASCAN_DIR = 'chimerascan'
-CHIMERASCAN_RESULTS_FILE = 'chimeras.bedpe'
-
-# defuse gene fusion analysis
-DEFUSE_DIR = 'defuse'
-DEFUSE_RESULTS_FILE = 'results.classify.txt'
-DEFUSE_CONFIG_FILE = 'config.txt'
-
 # contamination sequence mapping
 XENO_SAM_FILES = ('xeno_hits_read1.sam', 'xeno_hits_read2.sam')
 # filtered fastq files
@@ -60,6 +51,11 @@ SORTED_XENO_BAM_FILE = 'xeno_hits.srt.bam'
 # fragment size distribution
 FRAG_SIZE_DIST_FILE = "frag_size_dist.txt"
 FRAG_SIZE_DIST_PLOT_FILE = "frag_size_dist_plot.pdf"
+
+# chimerascan gene fusion analysis
+CHIMERASCAN_DIR = 'chimerascan'
+CHIMERASCAN_RESULTS_FILE = 'chimeras.bedpe'
+CHIMERASCAN_MIN_SEGMENT_LENGTH = 25
 
 # tophat alignment results
 TOPHAT_DIR = 'tophat'
@@ -155,10 +151,9 @@ def attach_sample_to_results(sample, root_dir):
             lane.filtered_fastq_files = []
             for readnum in xrange(len(lane.copied_fastq_files)):
                 lane.filtered_fastq_files.append(os.path.join(lane.output_dir, FILTERED_FASTQ_FILES[readnum]))
-            # defuse results
-            lane.defuse_dir = os.path.join(lane.output_dir, DEFUSE_DIR)
-            lane.defuse_config_file = os.path.join(lane.defuse_dir, DEFUSE_CONFIG_FILE)
-            lane.defuse_results_file = os.path.join(lane.defuse_dir, DEFUSE_RESULTS_FILE)
+            # chimerascan results
+            lane.chimerascan_dir = os.path.join(lane.output_dir, CHIMERASCAN_DIR)
+            lane.chimerascan_results_file = os.path.join(lane.chimerascan_dir, CHIMERASCAN_RESULTS_FILE)
             # Sorted abundant reads bam file
             lane.sorted_abundant_bam_file = os.path.join(lane.output_dir, SORTED_ABUNDANT_BAM_FILE)
             # Contaminant foreign organism (xeno) SAM files
@@ -242,10 +237,10 @@ def validate_lane_results(lane):
     if not check_sam_file(lane.sorted_abundant_bam_file, isbam=True):
         logging.error("Lane %s missing/corrupt abundant reads BAM file" % (lane.id))
         is_valid = False
-    # check defuse results (only run defuse for paired-end reads)    
+    # check chimerascan results (only run chimerascan for paired-end reads)    
     if ((len(lane.filtered_fastq_files) > 1) and 
-        (not file_exists_and_nz_size(lane.defuse_results_file))):
-        logging.error("Lane %s missing/corrupt defuse results file" % (lane.id))
+        (not file_exists_and_nz_size(lane.chimerascan_results_file))):
+        logging.error("Lane %s missing/corrupt chimerascan results file" % (lane.id))
         is_valid = False
     # check sorted foreign sequence bam file
     if not check_sam_file(lane.sorted_xeno_bam_file, isbam=True):
@@ -522,71 +517,35 @@ class ServerConfig(object):
             valid = False
         return valid    
 
-class DefuseConfig(object):    
-    path_params = {"gene_models": "",
-                   "genome_fasta": "",
-                   "repeats_filename": "",
-                   "est_fasta": "",
-                   "est_alignments": "",
-                   "unigene_fasta": "",
-                   "dataset_directory": ""}
-    params = {"clustering_precision": "0.95",
-              "span_count_threshold": "5",
-              "split_count_threshold": "3",
-              "percent_identity_threshold": "0.90",
-              "max_dist_pos": "600",
-              "num_dist_genes": "500",
-              "split_min_anchor": "4",
-              "max_concordant_ratio": "0.1",
-              "splice_bias": "10",
-              "denovo_assembly": "no",
-              "positive_controls": "$(data_directory)/controls.txt",
-              "probability_threshold": "0.50",
-              "covariance_sampling_density": "0.01",
-              "dna_concordant_length": "2000",
-              "discord_read_trim": "50"}
-
-    def __init__(self):
-        # check environment for location of source code
-        if "DEFUSEPATH" in os.environ:
-            self.source_dir = os.environ["DEFUSEPATH"]
-        else:
-            self.source_dir = ""
-        for k,v in DefuseConfig.path_params.iteritems():
-            setattr(self, k, v)
-        for k,v in DefuseConfig.params.iteritems():
-            setattr(self, k, v)
-
+class ChimerascanConfig(object):
     @staticmethod
     def from_xml_elem(elem):
-        c = DefuseConfig()
-        for subelem in elem.iter():
-            setattr(c, subelem.tag, subelem.text)
+        c = ChimerascanConfig()
+        for attrname in ("index", "trim5", "trim3", "frag_size_percentile"):
+            setattr(c, attrname, elem.findtext(attrname))
+        c.args = []
+        for arg_elem in elem.findall("arg"):
+            c.args.append(arg_elem.text)
         return c
     
     def to_xml(self, root):
-        for attrname in DefuseConfig.path_params.iterkeys():
+        for attrname in ("index", "trim5", "trim3", "frag_size_percentile"):
             attrval = getattr(self,attrname)
             if attrval is not None:
                 elem = etree.SubElement(root, attrname)
                 elem.text = str(attrval)
-        for attrname in DefuseConfig.params.iterkeys():
-            attrval = getattr(self,attrname)
-            if attrval is not None:
-                elem = etree.SubElement(root, attrname)
-                elem.text = str(attrval)
-    
+        for arg in self.args:
+            elem = etree.SubElement(root, "arg")
+            elem.text = arg            
+
     def is_valid(self, species_dir):
         valid = True
         species_sub = lambda arg: arg.replace("${SPECIES}", species_dir)
-        # required paths
-        for attrname in DefuseConfig.path_params.iterkeys():
-            val = getattr(self, attrname)
-            newval = species_sub(val)
-            if not os.path.exists(newval):
-                logging.error("File not found: %s" % (newval))
-                valid = False
-        return valid
+        newindex = species_sub(self.index)
+        if not os.path.exists(newindex):
+            logging.error("File not found: %s" % (newindex))
+            valid = False
+        return valid   
 
 class PipelineConfig(object):
     @staticmethod
@@ -633,8 +592,8 @@ class PipelineConfig(object):
         elem = root.find("cufflinks")
         for arg_elem in elem.findall("arg"):
             c.cufflinks_args.append(arg_elem.text)
-        # defuse parameters
-        c.defuse_config = DefuseConfig.from_xml_elem(root.find("defuse"))
+        # chimerascan parameters
+        c.chimerascan_config = ChimerascanConfig.from_xml_elem(root.find("chimerascan"))
         # server setup
         c.servers = {}
         for elem in root.findall("server"):
@@ -672,9 +631,9 @@ class PipelineConfig(object):
         for arg in self.cufflinks_args:
             elem = etree.SubElement(cufflinks_elem, "arg")
             elem.text = arg
-        # defuse parameters
-        defuse_elem = etree.SubElement(root, "defuse")
-        self.defuse_config.to_xml(defuse_elem)
+        # chimerascan parameters
+        chimerascan_elem = etree.SubElement(root, "chimerascan")
+        self.chimerascan_config.to_xml(chimerascan_elem)
         # servers
         for server in self.servers.itervalues():            
             elem = etree.SubElement(root, "server")
@@ -711,10 +670,10 @@ class PipelineConfig(object):
         if not genome.is_valid(server.references_dir):
             logging.error("Genome %s missing required files" % (species_name))
             valid = False
-        # check defuse config
+        # check chimerascan config
         species_dir = os.path.join(server.references_dir, genome.root_dir)
-        if not self.defuse_config.is_valid(species_dir):
-            logging.error("Defuse missing required files")
+        if not self.chimerascan_config.is_valid(species_dir):
+            logging.error("Chimerascan missing required files")
             valid = False
         #
         # Check software installation
@@ -830,5 +789,19 @@ class PipelineConfig(object):
             logging.debug("Checking for 'pysam' library... found")
         except ImportError, e:
             logging.error("Package 'pysam' not found")
+            valid = False
+        # chimerascan binary
+        msg = 'chimerascan'
+        if check_executable("chimerascan_run.py"):
+            logging.debug("Checking for '%s' binary... found" % msg)
+        else:
+            logging.error("'%s' binary not found or not executable" % msg)
+            valid = False            
+        # check for chimerascan libraries
+        try:
+            import chimerascan
+            logging.debug("Checking for 'chimerascan' library... found")
+        except ImportError, e:
+            logging.error("Package 'chimerascan' not found")
             valid = False
         return valid

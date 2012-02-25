@@ -12,7 +12,6 @@ from oncoseq.lib import config
 from oncoseq.lib.config import AnalysisConfig, PipelineConfig
 from oncoseq.lib.cluster import submit_job_pbs, submit_job_nopbs
 from oncoseq.lib.base import up_to_date
-from oncoseq.lib.defuse import get_defuse_config_string
 
 # setup pipeline script files
 import oncoseq.rnaseq.pipeline
@@ -141,52 +140,6 @@ def run_lane(lane, genome, server, pipeline, num_processors,
                                  deps=abundant_mapping_deps,
                                  stderr_filename=log_file)
         filtered_fastq_deps = [job_id]
-    #
-    # Run defuse gene fusion prediction for paired-end lanes
-    #
-    defuse_deps = []
-    if len(lane.filtered_fastq_files) > 1:
-        msg = "Running DeFuse gene fusion predictor"
-        if all(up_to_date(lane.defuse_results_file,f) for f in lane.filtered_fastq_files):
-            logging.info("[SKIPPED] %s" % (msg))
-        else:
-            logging.info("%s" % (msg))
-            if not os.path.exists(lane.defuse_dir):
-                logging.info("\tcreating directory: %s" % (lane.defuse_dir))
-                os.makedirs(lane.defuse_dir)
-            defuse_config = pipeline.defuse_config
-            species_root_dir = os.path.join(server.references_dir, genome.root_dir) 
-            # write defuse config file
-            config_str = get_defuse_config_string(species_root_dir, 
-                                                  defuse_config,
-                                                  max_fragment_size=pipeline.max_fragment_size,
-                                                  num_processors=num_processors)
-            f = open(lane.defuse_config_file, "w")
-            f.write(config_str)
-            f.close()
-            # setup command line
-            script = os.path.join(defuse_config.source_dir, "scripts", "defuse.pl")
-            args = [script, "-c", lane.defuse_config_file, "-d", lane.output_dir,
-                    "-o", lane.defuse_dir, "-p", num_processors] 
-            logging.debug("\targs: %s" % (' '.join(map(str, args))))
-            log_stderr_file = os.path.join(log_dir, "defuse_stderr.log")
-            log_stdout_file = os.path.join(log_dir, "defuse_stdout.log")
-            # allocate 24gb to run defuse
-            defuse_pmem = int(round(float(24000.0 / num_processors),0))
-            job_id = submit_job_func("defuse_%s" % (lane.id), args,
-                                     num_processors=num_processors,
-                                     node_processors=server.node_processors,
-                                     node_memory=server.node_mem,
-                                     pbs_script_lines=server.pbs_script_lines,
-                                     working_dir=lane.output_dir,
-                                     pmem=defuse_pmem,
-                                     walltime="80:00:00",
-                                     deps=filtered_fastq_deps,
-                                     stdout_filename=log_stdout_file,
-                                     stderr_filename=log_stderr_file)
-            defuse_deps = [job_id]
-    else:
-        logging.info("[SKIPPED] Cannot run DeFuse gene fusion predictor on single-end reads")
     #
     # sort abundant reads bam file
     #
@@ -332,6 +285,51 @@ def run_lane(lane, genome, server, pipeline, num_processors,
                                  deps=filtered_fastq_deps,
                                  stderr_filename=log_file)
         frag_size_deps = [job_id]
+    #
+    # run chimerascan gene fusion discovery tool
+    #
+    chimerascan_deps = []
+    if len(lane.filtered_fastq_files) > 1:
+        msg = "Finding gene fusions with chimerascan"
+        if (up_to_date(lane.chimerascan_results_file, lane.frag_size_dist_file) and
+            all(up_to_date(lane.chimerascan_results_file, f) for f in lane.filtered_fastq_files)):
+            logging.info("[SKIPPED] %s" % (msg))
+        else:
+            logging.info("%s" % (msg))
+            args = [sys.executable, os.path.join(_pipeline_dir, "run_chimerascan.py"),
+                    "-p", num_processors,
+                    "--library-type", config.get_tophat_library_type(lane.library.strand_protocol),
+                    "--trim5", pipeline.chimerascan_config.trim5,
+                    "--trim3", pipeline.chimerascan_config.trim3,
+                    "--frag-size-percentile", pipeline.chimerascan_config.frag_size_percentile]
+            for arg in pipeline.chimerascan_config.args:
+                # substitute species-specific root directory
+                species_arg = arg.replace("${SPECIES}", os.path.join(server.references_dir, genome.root_dir)) 
+                args.append('--arg="%s"' % species_arg)
+            # substitute species-specific index    
+            index = pipeline.chimerascan_config.index
+            species_index = index.replace("${SPECIES}", os.path.join(server.references_dir, genome.root_dir)) 
+            args.extend([lane.chimerascan_dir,
+                         species_index,
+                         lane.frag_size_dist_file])
+            args.extend(lane.filtered_fastq_files)
+            logging.debug("\targs: %s" % (' '.join(map(str, args))))
+            log_file = os.path.join(log_dir, "chimerascan.log")
+            # allocate 4gb per processor to run
+            pmem = int(4000)
+            job_id = submit_job_func("chimera_%s" % (lane.id), args,
+                                     num_processors=num_processors,
+                                     node_processors=server.node_processors,
+                                     node_memory=server.node_mem,
+                                     pbs_script_lines=server.pbs_script_lines,
+                                     working_dir=lane.output_dir,
+                                     pmem=pmem,
+                                     walltime="60:00:00",
+                                     deps=frag_size_deps,
+                                     stderr_filename=log_file)
+            chimerascan_deps = [job_id]
+    else:
+        logging.info("[SKIPPED] Cannot run chimerascan on single-end libraries")
     #
     # align reads with tophat
     #
@@ -486,7 +484,7 @@ def run_lane(lane, genome, server, pipeline, num_processors,
                                  deps=bedgraph_deps,
                                  stderr_filename=log_file)
         bigwig_deps = [job_id]
-    return tophat_deps, tophat_deps + defuse_deps + bigwig_deps
+    return tophat_deps, tophat_deps + chimerascan_deps + bigwig_deps
 
 
 def run_library(library, genome, server, pipeline, num_processors,

@@ -78,4 +78,70 @@ def get_defuse_config_string(species_dir, defuse_config,
                   "data_compress_regex_1                       = ^%s[12]\.fq(.*)$" % (FILTERED_FASTQ_PREFIX),
                   "data_converter_1                            = cat"])
     return '\n'.join(lines)
+
+
+class DefuseConfig(object):    
+    path_params = {"gene_models": "",
+                   "genome_fasta": "",
+                   "repeats_filename": "",
+                   "est_fasta": "",
+                   "est_alignments": "",
+                   "unigene_fasta": "",
+                   "dataset_directory": ""}
+    params = {"clustering_precision": "0.95",
+              "span_count_threshold": "5",
+              "split_count_threshold": "3",
+              "percent_identity_threshold": "0.90",
+              "max_dist_pos": "600",
+              "num_dist_genes": "500",
+              "split_min_anchor": "4",
+              "max_concordant_ratio": "0.1",
+              "splice_bias": "10",
+              "denovo_assembly": "no",
+              "positive_controls": "$(data_directory)/controls.txt",
+              "probability_threshold": "0.50",
+              "covariance_sampling_density": "0.01",
+              "dna_concordant_length": "2000",
+              "discord_read_trim": "50"}
+
+    def __init__(self):
+        # check environment for location of source code
+        if "DEFUSEPATH" in os.environ:
+            self.source_dir = os.environ["DEFUSEPATH"]
+        else:
+            self.source_dir = ""
+        for k,v in DefuseConfig.path_params.iteritems():
+            setattr(self, k, v)
+        for k,v in DefuseConfig.params.iteritems():
+            setattr(self, k, v)
+
+    @staticmethod
+    def from_xml_elem(elem):
+        c = DefuseConfig()
+        for subelem in elem.iter():
+            setattr(c, subelem.tag, subelem.text)
+        return c
     
+    def to_xml(self, root):
+        for attrname in DefuseConfig.path_params.iterkeys():
+            attrval = getattr(self,attrname)
+            if attrval is not None:
+                elem = etree.SubElement(root, attrname)
+                elem.text = str(attrval)
+        for attrname in DefuseConfig.params.iterkeys():
+            attrval = getattr(self,attrname)
+            if attrval is not None:
+                elem = etree.SubElement(root, attrname)
+                elem.text = str(attrval)
+    
+    def is_valid(self, species_dir):
+        valid = True
+        species_sub = lambda arg: arg.replace("${SPECIES}", species_dir)
+        # required paths
+        for attrname in DefuseConfig.path_params.iterkeys():
+            val = getattr(self, attrname)
+            newval = species_sub(val)
+            if not os.path.exists(newval):
+                logging.error("File not found: %s" % (newval))
+                valid = False
+        return valid
