@@ -42,6 +42,10 @@ SORTED_ABUNDANT_BAM_FILE = 'abundant_hits.srt.bam'
 FILTERED_FASTQ_PREFIX = 'filtered_read'
 FILTERED_FASTQ_FILES = tuple(("%s%d.fq" % (FILTERED_FASTQ_PREFIX,x)) for x in (1,2)) 
 
+# chimerascan gene fusion analysis
+CHIMERASCAN_DIR = 'chimerascan'
+CHIMERASCAN_RESULTS_FILE = 'chimeras.bedpe'
+
 # defuse gene fusion analysis
 DEFUSE_DIR = 'defuse'
 DEFUSE_RESULTS_FILE = 'results.classify.txt'
