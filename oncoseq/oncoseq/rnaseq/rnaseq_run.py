@@ -15,6 +15,7 @@ from oncoseq.lib.config import AnalysisConfig, PipelineConfig
 from oncoseq.lib.cluster import scp, ssh_exec, qstat_user_job_count, remote_copy_file, test_file_exists
 from oncoseq.lib import rundb
 
+import oncoseq
 import oncoseq.rnaseq.pipeline
 _pipeline_dir = oncoseq.rnaseq.pipeline.__path__[0] 
 
@@ -204,6 +205,8 @@ def run_remote(analysis_file, config_file, server_name, num_processors,
 def main():
     logging.basicConfig(level=logging.DEBUG,
                         format="%(asctime)s - %(name)s - %(levelname)s - %(message)s")
+    logging.info("Oncoseq version %s" % (oncoseq.__version__))
+    logging.info("==========================")
     parser = argparse.ArgumentParser()
     parser.add_argument("-p", type=int, dest="num_processors", default=1)
     parser.add_argument("--db", dest="db_file", default=None)
