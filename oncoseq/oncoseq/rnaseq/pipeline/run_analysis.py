@@ -581,11 +581,42 @@ def run_library(library, genome, server, pipeline, num_processors,
                                  deps=merge_lane_deps,
                                  stderr_filename=log_file)
         merge_bam_deps = [job_id]
+    
+    
+    #
+    # Clean the BAM file before calling SNVs
+    #
+    msg = "Calling SNVs with samtools"
+    cleaning_dep = []
+    if up_to_date(library.samtools_vcf_file, library.merged_bam_file):
+        logging.info("[SKIPPED] %s" % msg)
+    else:
+        logging.info(msg)
+        args = [sys.executable, os.path.join(_pipeline_dir, "bam_cleaner.py"),
+                pipeline.picard_dir,
+                server.tmp_dir,
+                library.merged_bam_file,
+                library.merged_cleaned_bam_file]
+        
+        log_file = os.path.join(log_dir, "bam_cleaning.log")
+        logging.debug("\targs: %s" % (' '.join(map(str, args))))
+        job_id = submit_job_func("bamcln_%s" % (library.id), args,
+                                 num_processors=1,
+                                 node_processors=server.node_processors,
+                                 node_memory=server.node_mem,
+                                 pbs_script_lines=server.pbs_script_lines,
+                                 working_dir=library.output_dir,
+                                 walltime="60:00:00",
+                                 deps=merge_bam_deps,
+                                 stderr_filename=log_file)
+        cleaning_dep = [job_id]
+
     #
     # call snps
     #
     msg = "Calling SNVs with samtools"
-    samtools_snv_deps = []
+    samtools_snv_deps = [] 
+    
     if up_to_date(library.samtools_vcf_file, library.merged_bam_file):
         logging.info("[SKIPPED] %s" % msg)
     else:
@@ -604,7 +635,7 @@ def run_library(library, genome, server, pipeline, num_processors,
                                  pbs_script_lines=server.pbs_script_lines,
                                  working_dir=library.output_dir,
                                  walltime="60:00:00",
-                                 deps=merge_bam_deps,
+                                 deps=cleaning_dep,
                                  stderr_filename=log_file)
         samtools_snv_deps = [job_id]    
     # 
@@ -632,7 +663,7 @@ def run_library(library, genome, server, pipeline, num_processors,
                                  pbs_script_lines=server.pbs_script_lines,
                                  working_dir=library.output_dir,
                                  walltime="60:00:00",
-                                 deps=merge_bam_deps,
+                                 deps=cleaning_dep,
                                  stdout_filename=log_stdout_file,
                                  stderr_filename=log_stderr_file)
         varscan_deps = [job_id]
