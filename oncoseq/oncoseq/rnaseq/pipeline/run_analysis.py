@@ -586,15 +586,15 @@ def run_library(library, genome, server, pipeline, num_processors,
     #
     # Clean the BAM file before calling SNVs
     #
-    msg = "Calling SNVs with samtools"
+    msg = "Cleaning BAM Files"
     cleaning_dep = []
-    if up_to_date(library.samtools_vcf_file, library.merged_bam_file):
+    if up_to_date(library.merged_cleaned_bam_file, library.merged_bam_file):
         logging.info("[SKIPPED] %s" % msg)
     else:
         logging.info(msg)
         args = [sys.executable, os.path.join(_pipeline_dir, "bam_cleaner.py"),
-                pipeline.picard_dir,
-                server.tmp_dir,
+                "--picard-dir",pipeline.picard_dir,
+                "--tmp-dir",tmp_dir,
                 library.merged_bam_file,
                 library.merged_cleaned_bam_file]
         

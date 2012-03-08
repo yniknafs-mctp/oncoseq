@@ -31,7 +31,8 @@ def markDuplicates(indexed_bam_file, outfile, picard_dir, use_mem=2048):
 
 
 def sortIndexSam(input_sam_file, output_bam_file, 
-                 use_mem=2048, picard_dir, sort_order='coordinate'):
+                picard_dir, sort_order='coordinate',
+                use_mem=2048):
     '''
     sort sam or bam
     SO=SortOrder Sort order of output file  Required. Possible values: {unsorted, queryname, coordinate} 
@@ -68,7 +69,8 @@ def bam_cleaner(bam_file, bam_smdup_file, picard_dir,tmp_dir):
         # Mark duplicates in the merged Bam file\n
         logging.info("SAM BAM CLEANER. Remove duplicates step for file %s" % (bam_smdup_file))
         args = markDuplicates(bam_file, btmp,picard_dir) #,MEM_PER_CORE,
-        retcode = subprocess.os(args)
+        print args
+        retcode = subprocess.call(args,shell=True)
         
         if retcode != 0:
             logging.error("SAM BAM CLEANER: Removing duplicates failed")
@@ -77,7 +79,8 @@ def bam_cleaner(bam_file, bam_smdup_file, picard_dir,tmp_dir):
             return config.JOB_ERROR
         
         args  = sortIndexSam(btmp, bam_smdup_file, picard_dir) #,MEM_PER_CORE)
-        retcode = subprocess.os(args)
+        print args
+        retcode = subprocess.call(args,shell=True)
 
         if retcode != 0:
             logging.error("SAM BAM CLEANER: Sorting BAM without duplicates file failed")
@@ -85,8 +88,8 @@ def bam_cleaner(bam_file, bam_smdup_file, picard_dir,tmp_dir):
                 os.remove(btmp)
             return config.JOB_ERROR
         
-        args = ['rm',btmp, bam_smdup_file]
-        retcode = subprocess.os(args)
+        args = ['rm',btmp]
+        retcode = subprocess.call(args)
 
         if retcode != 0:
             logging.error("SAM BAM CLEANER: Removing temporary files failed")
@@ -105,8 +108,8 @@ def main():
     parser.add_argument("--tmp-dir", dest="tmp_dir", default="")    
     parser.add_argument("bam_file")
     parser.add_argument("bam_smdup")
-    
     args = parser.parse_args()
+    
     return bam_cleaner(args.bam_file,
                        args.bam_smdup,
                        args.picard_dir, 

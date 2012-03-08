@@ -79,7 +79,7 @@ COVERAGE_BIGWIG_FILE = "coverage.bigwig"
 
 # merged alignment results
 MERGED_BAM_FILE = "merged_alignments.bam"
-MERGED_CLEN_BAM_FILE = "merged_alignments_srdup.bam"
+MERGED_CLEAN_BAM_FILE = "merged_alignments_srdup.bam"
 MERGED_FRAG_SIZE_DIST_FILE = "merged_frag_size_dist.txt"
 
 # snp calling results
@@ -118,7 +118,7 @@ def attach_sample_to_results(sample, root_dir):
         library.merged_frag_size_dist_file = os.path.join(library.output_dir, MERGED_FRAG_SIZE_DIST_FILE)
         # merged BAM file
         library.merged_bam_file = os.path.join(library.output_dir, MERGED_BAM_FILE)   
-        library.merged_cleaned_bam_file = os.path.join(library.output_dir, MERGED_CLEN_BAM_FILE)
+        library.merged_cleaned_bam_file = os.path.join(library.output_dir, MERGED_CLEAN_BAM_FILE)
         # SNP calling files
         library.samtools_bcf_file = os.path.join(library.output_dir, SAMTOOLS_VARIANT_BCF_FILE)
         library.samtools_vcf_file = os.path.join(library.output_dir, SAMTOOLS_VARIANT_VCF_FILE)
