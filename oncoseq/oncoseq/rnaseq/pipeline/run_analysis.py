@@ -315,15 +315,16 @@ def run_lane(lane, genome, server, pipeline, num_processors,
             args.extend(lane.filtered_fastq_files)
             logging.debug("\targs: %s" % (' '.join(map(str, args))))
             log_file = os.path.join(log_dir, "chimerascan.log")
-            # allocate 4gb per processor to run
-            pmem = int(4000)
+            # TODO: allocate 11.25gb per processor to run?!?
+            chimerascan_processors = min(4, server.node_processors, num_processors)
+            chimerascan_mem = 11250
             job_id = submit_job_func("chimera_%s" % (lane.id), args,
-                                     num_processors=num_processors,
+                                     num_processors=chimerascan_processors,
                                      node_processors=server.node_processors,
                                      node_memory=server.node_mem,
                                      pbs_script_lines=server.pbs_script_lines,
                                      working_dir=lane.output_dir,
-                                     pmem=pmem,
+                                     pmem=chimerascan_mem,
                                      walltime="60:00:00",
                                      deps=frag_size_deps,
                                      stderr_filename=log_file)
