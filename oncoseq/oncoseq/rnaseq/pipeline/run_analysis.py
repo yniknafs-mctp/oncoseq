@@ -661,6 +661,7 @@ def run_library(library, genome, server, pipeline, num_processors,
                                  num_processors=1,
                                  node_processors=server.node_processors,
                                  node_memory=server.node_mem,
+                                 pmem= int(round(float(server.node_mem)/2, 0)),
                                  pbs_script_lines=server.pbs_script_lines,
                                  working_dir=library.output_dir,
                                  walltime="60:00:00",
@@ -668,6 +669,7 @@ def run_library(library, genome, server, pipeline, num_processors,
                                  stdout_filename=log_stdout_file,
                                  stderr_filename=log_stderr_file)
         varscan_deps = [job_id]
+        
     #
     # run cufflinks to estimate transcript abundance of known genes
     #
