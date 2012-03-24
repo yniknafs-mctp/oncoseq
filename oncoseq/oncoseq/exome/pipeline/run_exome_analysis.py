@@ -253,7 +253,7 @@ def run_lane(lane, genome, server, pipeline, num_processors,
                                  pbs_script_lines=server.pbs_script_lines,
                                  working_dir=lane.output_dir,
                                  walltime="1:00:00",
-                                 deps=sam_deps,
+                                 deps=sam_sort_deps,
                                  stderr_filename=log_file)
     
 
