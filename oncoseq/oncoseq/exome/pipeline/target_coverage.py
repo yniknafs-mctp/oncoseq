@@ -47,7 +47,7 @@ def summarize_coverage(file,ofile):
     poor_cov=0
     First=True
     #hd1=["#chr", "start", "end", "name", "score", "strand","min_cov","max_cov","median_cov","mean_cov","bases_with_poor_cov","region_length"]
-    hd2=["#name", "chr", "start", "end", "length", "min_coverage", "total_coverage","mean_coverage","bases_with_poor_cov"]
+    hd2=["name", "chr", "start", "end", "length", "min_coverage", "total_coverage","mean_coverage","bases_with_poor_cov"]
     #of.write(",".join(map(str,hd1)).replace(',','\t')+'\n')
     ofcnv.write(",".join(map(str,hd2)).replace(',','\t')+'\n')
     
@@ -77,7 +77,7 @@ def summarize_coverage(file,ofile):
             np.min(exon_cov),np.max(exon_cov),np.median(exon_cov),total_cov/float(length) #np.mean(exon_cov)
             
             #ol=[chr, start, end, name, score, strand,min_cov,max_cov,median_cov,mean_cov,poor_cov,length]
-            cnv=[name, chr, start, end, length, min_cov,total_cov,mean_cov, poor_cov]
+            cnv=[name, 'chr%s'%(chr), start, end, length, min_cov,total_cov,mean_cov, poor_cov]
             
             #of.write(",".join(map(str,ol)).replace(',','\t')+'\n')
             ofcnv.write(",".join(map(str,cnv)).replace(',','\t')+'\n')

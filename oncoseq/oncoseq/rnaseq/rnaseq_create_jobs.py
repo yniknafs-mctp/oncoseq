@@ -30,8 +30,9 @@ def indent_xml(elem, level=0):
 
 def generate_analysis_xml(seqdb, output_dir):
     
-    root = etree.Element("analysis")
+    #root = etree.Element("analysis")
     for patient in seqdb.patients.itervalues():
+        root = etree.Element("analysis")
         print patient,patient.id
         output_file = os.path.join(output_dir, "%s.xml" % (patient.id))        
         #root = etree.Element("analysis")

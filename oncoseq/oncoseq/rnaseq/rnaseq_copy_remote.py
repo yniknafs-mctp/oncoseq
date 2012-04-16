@@ -46,50 +46,52 @@ def copy_remote(output_dir, config_file, server_name, job_name,
     os.remove(analysis_file)
     # process each sample
     copy_finished = True
-    for sample in analysis.samples:
-        src_dir = sample.output_dir
-        # check that analysis is finished by noting presence of
-        # job completion file
-        logging.info("Checking that analysis is complete")
-        if not test_file_exists(server.address, sample.job_complete_file, ssh_port):
-            logging.error("Sample %s missing 'job.done' status file, job might not be finished" % (sample.id))
-            copy_finished = False
-            continue
-        # prepare destination directory
-        dst_dir = os.path.join(output_dir, sample.id)
-        logging.info("Preparing destination directory: %s" % (dst_dir))
-        if os.path.exists(dst_dir):
-            if overwrite:
-                logging.warning("Overwriting contents of directory: %s" % (dst_dir))
-                shutil.rmtree(dst_dir)
-            else:
-                logging.error("Destination directory exists, cannot copy unless '--overwrite' is set")
+    for patient, patient_samples in analysis.patients.iteritems():
+        src_dir = patient.output_dir
+        for sample in patient_samples:
+            #src_dir = sample.output_dir
+            # check that analysis is finished by noting presence of
+            # job completion file
+            logging.info("Checking that analysis is complete")
+            if not test_file_exists(server.address, sample.job_complete_file, ssh_port):
+                logging.error("Sample %s missing 'job.done' status file, job might not be finished" % (sample.id))
                 copy_finished = False
                 continue
-        # copy to destination directory
-        logging.info("Copying results")
-        args = map(str, ["scp", "-P", ssh_port, "-r", server.address + ":" + src_dir, dst_dir])
-        retcode = subprocess.call(args)
-        if retcode != 0:
-            logging.error("Error copying results from %s to %s" % (src_dir, dst_dir))
-            copy_finished = False
-            continue
-        # validate copy
-        logging.info("Validating copy")
-        # reattach sample to local results and validate it
-        attach_sample_to_results(sample, output_dir)
-        is_valid = validate_sample_results(sample)
-        if not is_valid:
-            logging.error("Copied sample results are not valid.. deleting")
-            copy_finished = False
-            shutil.rmtree(dst_dir)
-            continue
-        # delete remote source directory
-        logging.info("Deleting remote data")        
-        retcode = ssh_exec(server.address, "rm -rf %s" % (src_dir), ssh_port)
-        if retcode != 0:
-            logging.error("Error deleting sample directory %s" % (src_dir))
-            copy_finished = False
+            # prepare destination directory
+            dst_dir = os.path.join(output_dir, sample.id)
+            logging.info("Preparing destination directory: %s" % (dst_dir))
+            if os.path.exists(dst_dir):
+                if overwrite:
+                    logging.warning("Overwriting contents of directory: %s" % (dst_dir))
+                    shutil.rmtree(dst_dir)
+                else:
+                    logging.error("Destination directory exists, cannot copy unless '--overwrite' is set")
+                    copy_finished = False
+                    continue
+            # copy to destination directory
+            logging.info("Copying results")
+            args = map(str, ["scp", "-P", ssh_port, "-r", server.address + ":" + src_dir, dst_dir])
+            retcode = subprocess.call(args)
+            if retcode != 0:
+                logging.error("Error copying results from %s to %s" % (src_dir, dst_dir))
+                copy_finished = False
+                continue
+            # validate copy
+            logging.info("Validating copy")
+            # reattach sample to local results and validate it
+            attach_sample_to_results(sample, output_dir)
+            is_valid = validate_sample_results(sample)
+            if not is_valid:
+                logging.error("Copied sample results are not valid.. deleting")
+                copy_finished = False
+                shutil.rmtree(dst_dir)
+                continue
+            # delete remote source directory
+            logging.info("Deleting remote data")        
+            retcode = ssh_exec(server.address, "rm -rf %s" % (src_dir), ssh_port)
+            if retcode != 0:
+                logging.error("Error deleting sample directory %s" % (src_dir))
+                copy_finished = False
     # delete job directory
     if copy_finished:
         logging.info("Deleting remote job")        

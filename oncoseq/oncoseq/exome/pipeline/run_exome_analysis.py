@@ -713,8 +713,10 @@ def run_analysis(analysis_file, config_file, server_name,
             # TODO: This could be changed by class A and class B
             if sample.cancer_progression == "benign":
                 benign_sample = sample.merged_cleaned_bam_efile
+                benign_cov = sample.probe_summary_file
             else:
                 tumor_sample = sample.merged_cleaned_bam_efile
+                tumor_cov = sample.probe_summary_file
             
             logging.info("Analyzing sample: %s" % (sample.id))        
             #
@@ -814,6 +816,39 @@ def run_analysis(analysis_file, config_file, server_name,
 
         call_deps=samtools_snv_deps + varscan_deps
         
+        
+        #
+        # Running CNV analysis with Exome CNV
+        #
+        '''        
+        msg = "Calling CNVs with Exome CNVs"
+        cnv_deps = []
+        if up_to_date(patient.patient.exome_cnv_file, sample.merged_cleaned_bam_efile):
+            logging.info("[SKIPPED] %s" % msg)
+        else:
+            logging.info(msg)
+            args = [sys.executable, os.path.join(_pipeline_dir, "ExomeCNV.r"),
+                    101,###### TMP   read_length",
+                    0.9,###### TMP "estimated_tumor_content",
+                    tumor_cov,
+                    benign_cov,
+                    patient.patient.exome_cnv_file]
+            log_stderr_file = os.path.join(log_dir, "exome_cnv_calling_stderr.log")
+            logging.debug("\targs: %s" % (' '.join(map(str, args))))
+            job_id = submit_job_func("cnv_%s" % (patient.id), args,
+                                     num_processors=1,
+                                     node_processors=server.node_processors,
+                                     node_memory=server.node_mem,
+                                     pbs_script_lines=server.pbs_script_lines,
+                                     working_dir=patient.output_dir,
+                                     walltime="24:00:00",
+                                     deps=patient_deps,
+                                     stdout_filename=log_stdout_file,
+                                     stderr_filename=log_stderr_file)
+            cnv_deps = [job_id]
+
+        call_deps.extend(cnv_deps)
+        '''
         #
         # write file indicating patient job is complete
         #
