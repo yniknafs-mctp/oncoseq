@@ -39,7 +39,8 @@ graphing.offset  = 1000000;
 
 chr.list         = paste("chr",c(1:22,"X","Y"),sep=""); #all
 input.header     = FALSE;
-input.has.chr    = FALSE;
+input.has.chr    = TRUE;
+input.skip       = 1;
 coverage.cols    = c("probe","chr","probe_start","probe_end",
                      "targeted.base","sequenced.base","coverage",
                      "average.coverage","base.with..10.coverage");
@@ -106,8 +107,8 @@ loadDemoCoverage = function()
 }
 loadCoverage = function(normal.fp,tumor.fp)	
 {
-  normal = read.table(normal.fp,header=input.header,sep="\t");
-  tumor  = read.table(tumor.fp ,header=input.header,sep="\t");
+  normal = read.table(normal.fp,header=input.header,skip=input.skip,sep="\t");
+  tumor  = read.table(tumor.fp ,header=input.header,skip=input.skip,sep="\t");
   names(normal) = coverage.cols;
   names(tumor)  = coverage.cols;
   if(!input.has.chr) 
