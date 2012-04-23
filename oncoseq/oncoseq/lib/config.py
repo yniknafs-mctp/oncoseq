@@ -106,7 +106,8 @@ COSMIC_QUAL_VCF = "cov_cosmic_positions.vcf"
 
 # CNV results
 CNV_FILE = "exome.cnvs.txt"
-
+LOH_FILE = "exome_loh.txt"
+CNV_PLOT = "exome_cnv_plot"
 
 # cufflinks output
 CUFFLINKS_DIR = "cufflinks"
@@ -160,6 +161,9 @@ def attach_patient_to_results(patient, samples, root_dir):
     patient.varscan_indel_file = os.path.join(patient.exome_dir, VARSCAN_VARIANT_IND_FILE)        
     patient.tumor_cosmic_file = os.path.join(patient.exome_dir,TUMOR_COSMIC_VCF)
     patient.exome_cnv_file = os.path.join(patient.exome_dir,CNV_FILE)
+    patient.exome_loh_file = os.path.join(patient.exome_dir,LOH_FILE)
+    patient.exome_cnv_plot = os.path.join(patient.exome_dir,CNV_PLOT)
+
     # Include GATK files
     
     # attach samples to results

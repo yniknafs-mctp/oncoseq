@@ -6,6 +6,7 @@ Created on Mar 15, 2012
 
 import argparse
 import logging
+import subprocess
 import sys
 import os
 
@@ -714,10 +715,12 @@ def run_analysis(analysis_file, config_file, server_name,
             if sample.cancer_progression == "benign":
                 benign_sample = sample.merged_cleaned_bam_efile
                 benign_cov = sample.probe_summary_file
+                    
             else:
                 tumor_sample = sample.merged_cleaned_bam_efile
                 tumor_cov = sample.probe_summary_file
-            
+                
+                
             logging.info("Analyzing sample: %s" % (sample.id))        
             #
             # create output dir
@@ -820,20 +823,33 @@ def run_analysis(analysis_file, config_file, server_name,
         #
         # Running CNV analysis with Exome CNV
         #
-        '''        
+        # Determining the Read length for the tumor sample
+        # TODO: This could be modified into a particular small function
+        '''
+        args = [pipeline.samtools_bin,"view",tumor_sample,"|", "head", "-n", "1", "|", "cut", "-f", "10"]                
+        args=",".join(args).replace(',',' ')
+        p1 =subprocess.Popen(args,stdout=subprocess.PIPE,shell=True)
+        t = p1.communicate()[0]
+        tumor_read_length=len(t.strip('\n'))
+        '''
         msg = "Calling CNVs with Exome CNVs"
         cnv_deps = []
-        if up_to_date(patient.patient.exome_cnv_file, sample.merged_cleaned_bam_efile):
+        if up_to_date(patient.exome_cnv_file, sample.merged_cleaned_bam_efile):
             logging.info("[SKIPPED] %s" % msg)
         else:
             logging.info(msg)
-            args = [sys.executable, os.path.join(_pipeline_dir, "ExomeCNV.r"),
-                    101,###### TMP   read_length",
-                    0.9,###### TMP "estimated_tumor_content",
-                    tumor_cov,
+            args = [sys.executable, os.path.join(_pipeline_dir, "exomeCNV.py"),
+                    pipeline.samtools_bin, 
+                    pipeline.rscript_bin,
                     benign_cov,
-                    patient.patient.exome_cnv_file]
+                    tumor_cov,
+                    patient.exome_loh_file,
+                    patient.exome_cnv_file,
+                    patient.exome_cnv_plot,
+                    tumor_sample]#,"TRUE"]
+            
             log_stderr_file = os.path.join(log_dir, "exome_cnv_calling_stderr.log")
+            log_stdout_file = os.path.join(log_dir, "exome_cnv_calling_stdout.log")
             logging.debug("\targs: %s" % (' '.join(map(str, args))))
             job_id = submit_job_func("cnv_%s" % (patient.id), args,
                                      num_processors=1,
@@ -848,7 +864,7 @@ def run_analysis(analysis_file, config_file, server_name,
             cnv_deps = [job_id]
 
         call_deps.extend(cnv_deps)
-        '''
+        
         #
         # write file indicating patient job is complete
         #
