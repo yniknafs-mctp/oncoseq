@@ -23,6 +23,8 @@ _lib_dir=oncoseq.lib.__path__[0]
 _pipeline_dir = oncoseq.exome.pipeline.__path__[0] 
 _pipeline_rnaseq_dir = oncoseq.rnaseq.pipeline.__path__[0] 
 
+#TODO: Adjust pmem= int(round(float(server.node_mem)/2, 0)), according to the input file size.
+# This way I am asking 22 GB of memory which could be overkilling.
 def run_lane(lane, genome, server, pipeline, num_processors,
              submit_job_func):
     #
@@ -236,6 +238,7 @@ def run_lane(lane, genome, server, pipeline, num_processors,
                                  num_processors=1,
                                  node_processors=server.node_processors,
                                  node_memory=server.node_mem,
+                                 pmem= int(round(float(server.node_mem)/2, 0)),
                                  pbs_script_lines=server.pbs_script_lines,
                                  working_dir=lane.output_dir,
                                  walltime="12:00:00",
@@ -382,6 +385,7 @@ def run_library(library, genome, server, pipeline, num_processors,
                                  num_processors=1,
                                  node_processors=server.node_processors,
                                  node_memory=server.node_mem,
+                                 pmem=int(round(float(server.node_mem)/2, 0)),
                                  pbs_script_lines=server.pbs_script_lines,
                                  working_dir=library.output_dir,
                                  walltime="60:00:00",
@@ -778,6 +782,7 @@ def run_analysis(analysis_file, config_file, server_name,
                                      num_processors=1,
                                      node_processors=server.node_processors,
                                      node_memory=server.node_mem,
+                                     pmem= int(round(float(server.node_mem)/2, 0)),
                                      pbs_script_lines=server.pbs_script_lines,
                                      working_dir=patient.output_dir,
                                      walltime="60:00:00",
