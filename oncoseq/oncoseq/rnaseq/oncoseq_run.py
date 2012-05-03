@@ -149,13 +149,15 @@ def run_remote(analysis_file, config_file, server_name, num_processors,
                             # repository mirror
                             remote_file = os.path.join(server.seq_repo_mirror_dir,
                                                        os.path.basename(local_file))
+                            
                             if test_file_exists(remote_file, server.address, 
                                                 username, server.ssh_port):
                                 setattr(lane, attrname, remote_file)
                                 found = True
                                 logging.info("Found fastq file %s at %s" % (local_file, remote_file))
                             else:
-                                logging.info("Fastq file %s not found on remote server" % (local_file))                            
+                                logging.info("Fastq file %s not found on remote server" % (local_file))
+                        
                         if not found:
                             # copy fastq files to remote location and 
                             # replace fastq fields in XML file
