@@ -121,8 +121,9 @@ def run_remote(analysis_file, config_file, server_name, num_processors,
     for patient in analysis.patients:
         #
         # make working dir for patient and protocols
-        # TODO: Change this to use the directly the patient ouput dir, with out creating the patient_path
-        patient_path=os.path.join(job_output_dir, patient.id)
+        # TODO: Change this to use the directly the patient output dir, with out creating the patient_path
+        #
+        patient_path = os.path.join(job_output_dir, patient.id)
         logging.info("Making directory for patient %s" % (patient.id))
         ssh_exec(server.address, "mkdir -p %s" % (patient_path), server.ssh_port)
         
@@ -135,10 +136,9 @@ def run_remote(analysis_file, config_file, server_name, num_processors,
             protocol_path = os.path.join(patient_path,VALID_PROTOCOLS[sample.protocol])
             # create a path for the sample in the protocol directory
             sample_path = os.path.join(protocol_path, sample.id)
-            #
-            #
             logging.info("Making directory for sample %s" % (sample.id))
             ssh_exec(server.address, "mkdir -p %s" % (sample_path), server.ssh_port)
+            # 
             for library in sample.libraries:
                 for lane in library.lanes:
                     for readnum,attrname in enumerate(("read1_file", "read2_file")):
@@ -185,7 +185,6 @@ def run_remote(analysis_file, config_file, server_name, num_processors,
     #
     # copy configuration file to remote location
     #
-    
     logging.info("Copying pipeline configuration XML file")
     remote_config_file = os.path.join(job_output_dir, config.REMOTE_CONFIG_XML_FILE)
     local_config_file = os.path.join(local_tmp_dir, "tmp_pipeline_config.xml")
