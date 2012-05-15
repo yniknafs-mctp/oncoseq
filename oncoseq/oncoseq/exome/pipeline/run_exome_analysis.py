@@ -246,9 +246,13 @@ def run_lane(lane, genome, server, pipeline, num_processors,
                                  stderr_filename=log_file)
         
         sam_sort_deps.extend([job_id])
-        
-        args=["rm",lane.exome_bam_tmp]
-        msg = "Removing the temporary BAM file"
+        # Removing Intermediate files and original sequence reads.
+        args=["rm",lane.exome_bam_tmp, lane.exome_sam_aln]       
+        for readnum in xrange(len(lane.copied_fastq_files)):
+            fastq_file = lane.copied_fastq_files[readnum]
+            args.append(fastq_file)
+            
+        msg = "Removing the temporary BAM/SAM files and copied sequence reads"
         logging.debug("\targs: %s" % (' '.join(map(str, args))))
         job_id = submit_job_func("rm_tmp_%s" % (lane.id), args,
                                  num_processors=1,

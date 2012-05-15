@@ -217,6 +217,7 @@ class SeqDB(object):
         patients = {}
         for field_dict in read_wksheet(wkbook.sheet_by_name("patients")):
             p = Patient(**field_dict)
+            print p.id
             patients[p.id] = p
         # read samples
         samples = {}
