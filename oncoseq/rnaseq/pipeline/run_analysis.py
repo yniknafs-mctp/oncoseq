@@ -776,11 +776,14 @@ def run_analysis(analysis_file, config_file, server_name,
     # analysis attach_to_results. Decide after performing run test.
     
     for sample in analysis.samples:
-        if sample.protocol != config.RNASEQ:
-            logging.info("IN RNASEQ protocol SKIPPING sample: %s, because protocol is %s" % (sample.id,sample.protocol))
+        print sample.protocol, config.RNASEQ, config.RNASEQ_CAPTURE
+        print len(sample.protocol), len(config.RNASEQ), len(config.RNASEQ_CAPTURE)
+        rna_protocols=[config.RNASEQ,config.RNASEQ_CAPTURE]
+        if sample.protocol not in rna_protocols:
+            logging.info("IN RNASEQ protocol SKIPPING sample: %s, because protocol is %s, %s, %s" % (sample.id,sample.protocol, config.RNASEQ_CAPTURE,config.RNASEQ))
             continue
             
-        logging.info("Analyzing sample: %s" % (sample.id))        
+        logging.info("Analyzing sample: %s of protocol %s" % (sample.id,sample.protocol))        
         #
         # create output dir
         #
@@ -814,6 +817,7 @@ def run_analysis(analysis_file, config_file, server_name,
         #
         # write file indicating job is complete
         #
+        
         msg = "Notifying user that job is complete"
         if os.path.exists(sample.job_complete_file) and (len(sample_deps) == 0):
             logging.info("[SKIPPED]: %s" % msg)
@@ -831,7 +835,8 @@ def run_analysis(analysis_file, config_file, server_name,
                                      email="ae",
                                      deps=sample_deps)
             sample_deps = [job_id]
-        deps.extend(sample_deps)        
+        deps.extend(sample_deps)
+         
     return config.JOB_SUCCESS
 
 

@@ -867,6 +867,7 @@ class PipelineConfig(object):
             logging.error("Server %s missing required paths" % (server_name))
             valid = False
         # check genome
+        print species_name
         if species_name not in self.species:
             logging.error("Genome %s not found" % (species_name))
             return False
