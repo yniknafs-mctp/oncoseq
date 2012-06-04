@@ -3,25 +3,19 @@ Created on Mar 15, 2012
 
 @author: oabalbin
 '''
-
-import argparse
 import logging
-import subprocess
 import sys
 import os
 
 from oncoseq.lib import config
-from oncoseq.lib.config import AnalysisConfig, PipelineConfig
-from oncoseq.lib.cluster import submit_job_pbs, submit_job_nopbs
 from oncoseq.lib.base import up_to_date
+from oncoseq.lib.seqdb import SAMPLE_TYPE_EXOME_TUMOR, SAMPLE_TYPE_EXOME_NORMAL
 
 # setup pipeline script files
-import oncoseq.lib
+import oncoseq.pipeline
 import oncoseq.exome.pipeline
-import oncoseq.rnaseq.pipeline
-_lib_dir=oncoseq.lib.__path__[0]
-_pipeline_dir = oncoseq.exome.pipeline.__path__[0] 
-_pipeline_rnaseq_dir = oncoseq.rnaseq.pipeline.__path__[0] 
+_oncoseq_pipeline_dir = oncoseq.pipeline.__path__[0]
+_exome_pipeline_dir = oncoseq.exome.pipeline.__path__[0] 
 
 #TODO: Adjust pmem= int(round(float(server.node_mem)/2, 0)), according to the input file size.
 # This way I am asking 22 GB of memory which could be overkilling.
@@ -39,8 +33,36 @@ def run_lane(lane, genome, server, pipeline, num_processors,
         logging.info("Creating directory: %s" % (log_dir))
         os.makedirs(log_dir)
     #
+    # run fastqc program
+    #
+    qual_fastq_deps = []
+    skip_run = True
+    for readnum in xrange(len(lane.fastq_files)):    
+        skip_run = skip_run and (up_to_date(lane.fastqc_data_files[readnum], lane.fastq_files[readnum]) and
+                                 up_to_date(lane.fastqc_report_files[readnum], lane.fastq_files[readnum]))
+    msg = "Running FASTQC quality assessment"
+    if skip_run:
+        logging.info("[SKIPPED] %s" % msg)
+    else:
+        logging.info("%s" % msg)       
+        num_threads = min(num_processors, len(lane.fastq_files))
+        args = [pipeline.fastqc_bin, 
+                "--threads", num_threads,
+                "-o", lane.output_dir]
+        args.extend(lane.fastq_files)        
+        log_file = os.path.join(log_dir, "fastqc.log")
+        job_id = submit_job_func("fqc_%s" % (lane.id), args,
+                                 num_processors=num_threads,
+                                 node_processors=server.node_processors,
+                                 node_memory=server.node_mem,
+                                 pbs_script_lines=server.pbs_script_lines,
+                                 working_dir=lane.output_dir,
+                                 walltime="10:00:00",
+                                 stderr_filename=log_file)
+        qual_fastq_deps.extend([job_id])
+    #
     # copy and uncompress reads
-    # 
+    #
     msg = "Copying and uncompressing read sequences"
     copy_fastq_deps = []
     for readnum in xrange(len(lane.fastq_files)):
@@ -48,9 +70,10 @@ def run_lane(lane, genome, server, pipeline, num_processors,
             logging.info("[SKIPPED] %s read%d" % (msg, readnum+1))
         else:
             logging.info("%s read%d" % (msg, readnum+1))       
-            pyscript = os.path.join(_lib_dir, "copy_uncompress_fastq.py")    
+            pyscript = os.path.join(_oncoseq_pipeline_dir, "copy_uncompress_fastq.py")    
             args = [sys.executable, pyscript,
                     "--quals", lane.quality_scores,
+                    "--fastqc-data-files", ",".join(lane.fastqc_data_files),
                     lane.fastq_files[readnum],
                     lane.copied_fastq_files[readnum]]
             log_file = os.path.join(log_dir, "copy_uncompress_fastq_read%d.log" % (readnum+1))
@@ -61,38 +84,9 @@ def run_lane(lane, genome, server, pipeline, num_processors,
                                      pbs_script_lines=server.pbs_script_lines,
                                      working_dir=lane.output_dir,
                                      walltime="20:00:00",
+                                     deps=qual_fastq_deps,
                                      stderr_filename=log_file)
             copy_fastq_deps.append(job_id)
-    #
-    # run fastqc program
-    #
-    qual_fastq_deps=[]
-    skip_run = True
-    for readnum in xrange(len(lane.fastq_files)):    
-        skip_run = skip_run and (up_to_date(lane.fastqc_data_files[readnum], lane.copied_fastq_files[readnum]) and
-                                 up_to_date(lane.fastqc_report_files[readnum], lane.copied_fastq_files[readnum]))
-    msg = "Running FASTQC quality assessment"
-    if skip_run:
-        logging.info("[SKIPPED] %s" % msg)
-    else:
-        logging.info("%s" % msg)       
-        num_threads = min(num_processors, len(lane.copied_fastq_files))
-        args = [pipeline.fastqc_bin, 
-                "--threads", num_threads,
-                "-o", lane.output_dir]
-        args.extend(lane.copied_fastq_files)        
-        log_file = os.path.join(log_dir, "fastqc.log")
-        job_id = submit_job_func("fqc_%s" % (lane.id), args,
-                                 num_processors=num_threads,
-                                 node_processors=server.node_processors,
-                                 node_memory=server.node_mem,
-                                 pbs_script_lines=server.pbs_script_lines,
-                                 working_dir=lane.output_dir,
-                                 walltime="10:00:00",
-                                 deps=copy_fastq_deps,
-                                 stderr_filename=log_file)
-        qual_fastq_deps.extend([job_id])
-
 
     # TODO:
     # align against contaminants and filter out contaminant reads 
@@ -141,7 +135,7 @@ def run_lane(lane, genome, server, pipeline, num_processors,
                                          pbs_script_lines=server.pbs_script_lines,
                                          working_dir=lane.output_dir,
                                          walltime="24:00:00",
-                                         deps=qual_fastq_deps,
+                                         deps=copy_fastq_deps,
                                          stderr_filename=log_file)
                 
                 aln_sai_files.append(aln_read)
@@ -377,7 +371,7 @@ def run_library(library, genome, server, pipeline, num_processors,
         logging.info("[SKIPPED] %s" % msg)
     else:
         logging.info(msg)
-        args = [sys.executable, os.path.join(_lib_dir, "bam_cleaner.py"),
+        args = [sys.executable, os.path.join(_oncoseq_pipeline_dir, "bam_cleaner.py"),
                 "--picard-dir",pipeline.picard_dir,
                 "--tmp-dir",tmp_dir,
                 library.merged_bam_efile,
@@ -404,7 +398,11 @@ def run_library(library, genome, server, pipeline, num_processors,
 
 def run_sample(sample, genome, server, pipeline, num_processors,
                submit_job_func):
-    sample_deps = []
+    # create output dir
+    if not os.path.exists(sample.output_dir):
+        logging.info("Creating sample directory: %s" % (sample.output_dir))
+        os.makedirs(sample.output_dir)
+    # process libraries
     library_deps = []
     for library in sample.libraries:
         logging.info("Analyzing library: %s" % (library.id)) 
@@ -416,10 +414,7 @@ def run_sample(sample, genome, server, pipeline, num_processors,
             os.makedirs(library.output_dir)
         library_deps.extend(run_library(library, genome, server, pipeline, num_processors, 
                                 submit_job_func))
-        
-    # TODO Merging at the sample level if more than one exome library by sample
-    
-        # 
+    #
     # create directories for tmp and log files
     #
     tmp_dir = os.path.join(sample.output_dir, "tmp") 
@@ -430,6 +425,9 @@ def run_sample(sample, genome, server, pipeline, num_processors,
     if not os.path.exists(log_dir):
         logging.info("Creating directory: %s" % (log_dir))
         os.makedirs(log_dir)
+        
+    # TODO: Merging at the sample level if more than one exome library by sample
+
     
     #
     # merge lane alignment results
@@ -476,7 +474,7 @@ def run_sample(sample, genome, server, pipeline, num_processors,
                 logging.info("[SKIPPED] %s" % msg)
             else:
                 logging.info(msg)
-                args = [sys.executable, os.path.join(_lib_dir, "bam_cleaner.py"),
+                args = [sys.executable, os.path.join(_oncoseq_pipeline_dir, "bam_cleaner.py"),
                         "--picard-dir",pipeline.picard_dir,
                         "--tmp-dir",tmp_dir,
                         sample.merged_bam_efile,
@@ -535,7 +533,7 @@ def run_sample(sample, genome, server, pipeline, num_processors,
         logging.info("[SKIPPED] %s" % msg)
     else:
         logging.info(msg)
-        args = [sys.executable, os.path.join(_pipeline_dir, "cosmic_positions_homozygosity.py"),
+        args = [sys.executable, os.path.join(_exome_pipeline_dir, "cosmic_positions_homozygosity.py"),
                 os.path.join(server.references_dir, genome.get_path("genome_bwa_index")),
                 sample.merged_cleaned_bam_efile,
                 "None", # Any samtools_bcf_file not used
@@ -565,7 +563,7 @@ def run_sample(sample, genome, server, pipeline, num_processors,
         logging.info("[SKIPPED] %s" % msg)
     else:
         logging.info(msg)
-        args = [sys.executable, os.path.join(_pipeline_dir, "target_coverage.py"),
+        args = [sys.executable, os.path.join(_exome_pipeline_dir, "target_coverage.py"),
                 os.path.join(server.references_dir, genome.get_path("genome_bwa_index")),
                 sample.merged_cleaned_bam_efile,
                 "", # Any samtools_bcf_file not used
@@ -594,7 +592,7 @@ def run_sample(sample, genome, server, pipeline, num_processors,
         logging.info("[SKIPPED] %s" % msg)
     else:
         logging.info(msg)
-        args = [sys.executable, os.path.join(_pipeline_dir, "target_coverage.py"),
+        args = [sys.executable, os.path.join(_exome_pipeline_dir, "target_coverage.py"),
                 sample.merged_cleaned_bam_efile,
                 os.path.join(server.references_dir, genome.get_path("capture_roche")),
                 sample.probe_coverage_file,
@@ -664,259 +662,147 @@ def run_sample(sample, genome, server, pipeline, num_processors,
                                  stderr_filename=log_file)
         bigwig_deps = [job_id]
 
-    
-
-    deps=cleaning_dep + homo_dep + cov_pro_dep + bigwig_deps #+ cov_pro_dep #+ cov_exon_dep
-    sample_deps.extend(deps)
-            
+    sample_deps=cleaning_dep + homo_dep + cov_pro_dep + bigwig_deps #+ cov_pro_dep #+ cov_exon_dep
     return sample_deps
 
-
-def run_analysis(analysis_file, config_file, server_name,
-                 num_processors, keep_tmp, rm_fastq):
-    """
-    rm_fastq: (True/False) delete fastq files after run
-    keep_tmp: (True/False) delete temporary files after run
-    """
+def run_sample_group(grp, genome, server, pipeline, num_processors,
+                     submit_job_func, keep_tmp):
+    # check exome samples
+    tumor_sample = grp.samples[SAMPLE_TYPE_EXOME_TUMOR]
+    benign_sample = grp.samples[SAMPLE_TYPE_EXOME_NORMAL]
+    if (benign_sample is None) or (tumor_sample is None):
+        logging.info("Skipping exome analysis: tumor and/or benign exome samples missing")
+        return config.JOB_SUCCESS
+    # process samples
+    sample_deps = run_sample(benign_sample, genome, server, pipeline, 
+                             num_processors, submit_job_func)
+    sample_deps.extend(run_sample(tumor_sample, genome, server, pipeline, 
+                                  num_processors, submit_job_func))
+    # make temp directories
+    tmp_dir = os.path.join(grp.output_dir, "tmp") 
+    if not os.path.exists(tmp_dir):
+        logging.info("Creating directory: %s" % (tmp_dir))
+        os.makedirs(tmp_dir)
+    log_dir = os.path.join(grp.output_dir, "log")
+    if not os.path.exists(log_dir):
+        logging.info("Creating directory: %s" % (log_dir))
+        os.makedirs(log_dir)
     #
-    # read configuration files
+    # Call somatic variants with samtools
     #
-    analysis = AnalysisConfig.from_xml(analysis_file)
-    pipeline = PipelineConfig.from_xml(config_file)
-    #
-    # validate configuration files
-    #
-    if not analysis.is_valid():
-        logging.error("Analysis config not valid")
-        return config.JOB_ERROR
-    
-    if not pipeline.is_valid(server_name, analysis.species):
-        logging.error("Pipeline config not valid")
-        return config.JOB_ERROR
-        
-    # setup server
-    server = pipeline.servers[server_name]
-    if server.pbs:
-        submit_job_func = submit_job_pbs
+    msg = "Calling somatic SNVs with samtools"
+    samtools_snv_deps = []
+    if (up_to_date(grp.samtools_vcf_file, benign_sample.merged_cleaned_bam_efile) and
+        up_to_date(grp.samtools_vcf_file, tumor_sample.merged_cleaned_bam_efile)):
+        logging.info("[SKIPPED] %s" % msg)
     else:
-        submit_job_func = submit_job_nopbs
-    # setup genome references
-    genome = pipeline.species[analysis.species]
-    #
-    # attach analysis to pipeline output directory
-    #
-    analysis.attach_to_results(server.output_dir)    
-    #
-    # process each sample in analysis
-    #
+        logging.info(msg)
+        args = [sys.executable, os.path.join(_exome_pipeline_dir, "snps_bySamtools_Somatic.py"),
+                os.path.join(server.references_dir, genome.get_path("genome_bwa_index")),
+                benign_sample.merged_cleaned_bam_efile,
+                tumor_sample.merged_cleaned_bam_efile,
+                grp.samtools_bcf_file,
+                grp.samtools_vcf_file]
+        log_file = os.path.join(log_dir, "samtools_snp_calling.log")
+        log_stderr_file = os.path.join(log_dir, "samtools_snp_calling_stderr.log")
+        logging.debug("\targs: %s" % (' '.join(map(str, args))))
+        job_id = submit_job_func("samsnv_%s" % (grp.id), args,
+                                 num_processors=1,
+                                 node_processors=server.node_processors,
+                                 node_memory=server.node_mem,
+                                 pmem= int(round(float(server.node_mem)/2, 0)),
+                                 pbs_script_lines=server.pbs_script_lines,
+                                 working_dir=grp.output_dir,
+                                 walltime="60:00:00",
+                                 deps=sample_deps,
+                                 stderr_filename=log_file)
+        samtools_snv_deps = [job_id]    
     # 
-    # create directories for tmp and log files
-    #    
-    patient_deps = []
-    for patient, patient_samples in analysis.patients.iteritems():
-        
-        for sample in patient_samples:
-            if sample.protocol != config.EXOME:
-                logging.info("IN EXOME protocol SKIPPING sample: %s, because protocol is %s" % (sample.id,sample.protocol))
-                continue
-            # TODO: This could be changed by class A and class B
-            if sample.cancer_progression == "benign":
-                benign_sample = sample.merged_cleaned_bam_efile
-                benign_cov = sample.probe_summary_file
-                    
-            else:
-                tumor_sample = sample.merged_cleaned_bam_efile
-                tumor_cov = sample.probe_summary_file
-                
-                
-            logging.info("Analyzing sample: %s" % (sample.id))        
-            #
-            # create output dir
-            #
-            if not os.path.exists(sample.output_dir):
-                logging.info("Creating sample directory: %s" % (sample.output_dir))
-                os.makedirs(sample.output_dir)
-            #
-            # process sample
-            #        
-            sample_deps = run_sample(sample, genome, server, pipeline, 
-                                     num_processors, submit_job_func)
-        
-        # Finish work at sample level for this patient
-        patient_deps.extend(sample_deps)
-        
-        tmp_dir = os.path.join(patient.output_dir, "tmp") 
-        if not os.path.exists(tmp_dir):
-            logging.info("Creating directory: %s" % (tmp_dir))
-            os.makedirs(tmp_dir)
-        log_dir = os.path.join(patient.output_dir, "log")
-        if not os.path.exists(log_dir):
-            logging.info("Creating directory: %s" % (log_dir))
-            os.makedirs(log_dir)
-        
-        # TODO: Analysis at the patient level:
-        # Calling of somatic mutations
-        # Calling of Somatic CNVs
-        #       Calling of LOH
-        #       Calling of Germline Mutations
-        # Determine confidence for particular cosmic positions
-        # Compute coverage over the probe regions
-        
-        
-        #
-        # call somatic snps
-        #
-        msg = "Calling SOMATIC SNVs with samtools"
-        samtools_snv_deps = [] 
-        
-        if up_to_date(patient.samtools_vcf_file, sample.merged_cleaned_bam_efile):
-            logging.info("[SKIPPED] %s" % msg)
-        else:
-            logging.info(msg)
-            args = [sys.executable, os.path.join(_pipeline_dir, "snps_bySamtools_Somatic.py"),
-                    os.path.join(server.references_dir, genome.get_path("genome_bwa_index")),
-                    benign_sample,
-                    tumor_sample,
-                    patient.samtools_bcf_file,
-                    patient.samtools_vcf_file]
-            log_file = os.path.join(log_dir, "samtools_snp_calling.log")
-            log_stderr_file = os.path.join(log_dir, "samtools_snp_calling_stderr.log")
-            logging.debug("\targs: %s" % (' '.join(map(str, args))))
-            job_id = submit_job_func("samsnv_%s" % (patient.id), args,
-                                     num_processors=1,
-                                     node_processors=server.node_processors,
-                                     node_memory=server.node_mem,
-                                     pmem= int(round(float(server.node_mem)/2, 0)),
-                                     pbs_script_lines=server.pbs_script_lines,
-                                     working_dir=patient.output_dir,
-                                     walltime="60:00:00",
-                                     deps=patient_deps,
-                                     stderr_filename=log_file)
-            samtools_snv_deps = [job_id]    
-        # 
-        # Call SNVs using varscan
-        #
-                
-        msg = "Calling SOMATIC SNVs with VarScan"
-        varscan_deps = []
-        if up_to_date(patient.varscan_snv_file, sample.merged_cleaned_bam_efile):
-            logging.info("[SKIPPED] %s" % msg)
-        else:
-            logging.info(msg)
-            args = [sys.executable, os.path.join(_pipeline_dir, "snps_byVarScan_Somatic.py"),
-                    "--varscan-dir", pipeline.varscan_dir,
-                    os.path.join(server.references_dir, genome.get_path("genome_bwa_index")),
-                    benign_sample,
-                    tumor_sample,
-                    patient.varscan_snv_file,
-                    patient.varscan_indel_file]
-            log_stdout_file = os.path.join(log_dir, "varscan_snp_calling_stdout.log")
-            log_stderr_file = os.path.join(log_dir, "varscan_snp_calling_stderr.log")
-            logging.debug("\targs: %s" % (' '.join(map(str, args))))
-            job_id = submit_job_func("varscan_%s" % (patient.id), args,
-                                     num_processors=1,
-                                     node_processors=server.node_processors,
-                                     node_memory=server.node_mem,
-                                     pmem= int(round(float(server.node_mem)/2, 0)),
-                                     pbs_script_lines=server.pbs_script_lines,
-                                     working_dir=patient.output_dir,
-                                     walltime="60:00:00",
-                                     deps=patient_deps,
-                                     stdout_filename=log_stdout_file,
-                                     stderr_filename=log_stderr_file)
-            varscan_deps = [job_id]
-
-        call_deps=samtools_snv_deps + varscan_deps
-        
-        
-        #
-        # Running CNV analysis with Exome CNV
-        #
-        # Determining the Read length for the tumor sample
-        # TODO: This could be modified into a particular small function
-        '''
-        args = [pipeline.samtools_bin,"view",tumor_sample,"|", "head", "-n", "1", "|", "cut", "-f", "10"]                
-        args=",".join(args).replace(',',' ')
-        p1 =subprocess.Popen(args,stdout=subprocess.PIPE,shell=True)
-        t = p1.communicate()[0]
-        tumor_read_length=len(t.strip('\n'))
-        '''
-        msg = "Calling CNVs with Exome CNVs"
-        cnv_deps = []
-        if up_to_date(patient.exome_cnv_file, sample.merged_cleaned_bam_efile):
-            logging.info("[SKIPPED] %s" % msg)
-        else:
-            logging.info(msg)
-            args = [sys.executable, os.path.join(_pipeline_dir, "exomeCNV.py"),
-                    pipeline.samtools_bin, 
-                    pipeline.rscript_bin,
-                    benign_cov,
-                    tumor_cov,
-                    patient.exome_loh_file,
-                    patient.exome_cnv_file,
-                    patient.exome_cnv_plot,
-                    tumor_sample]#,"TRUE"]
-            
-            log_stderr_file = os.path.join(log_dir, "exome_cnv_calling_stderr.log")
-            log_stdout_file = os.path.join(log_dir, "exome_cnv_calling_stdout.log")
-            logging.debug("\targs: %s" % (' '.join(map(str, args))))
-            job_id = submit_job_func("cnv_%s" % (patient.id), args,
-                                     num_processors=1,
-                                     node_processors=server.node_processors,
-                                     node_memory=server.node_mem,
-                                     pbs_script_lines=server.pbs_script_lines,
-                                     working_dir=patient.output_dir,
-                                     walltime="24:00:00",
-                                     deps=patient_deps,
-                                     stdout_filename=log_stdout_file,
-                                     stderr_filename=log_stderr_file)
-            cnv_deps = [job_id]
-
-        call_deps.extend(cnv_deps)
-        
-        #
-        # write file indicating patient job is complete
-        #
-        msg = "Notifying user that job is complete"
-        if os.path.exists(patient.job_complete_file) and (len(sample_deps) == 0):
-            logging.info("[SKIPPED]: %s" % msg)
-        else:
-            logging.info(msg)
-            args = [sys.executable, os.path.join(_lib_dir, "notify_complete.py"),
-                    patient.job_complete_file]
-            job_id = submit_job_func("done_%s" % (patient.id), args,
-                                     num_processors=1,
-                                     node_processors=server.node_processors,
-                                     node_memory=server.node_mem,
-                                     pbs_script_lines=server.pbs_script_lines,
-                                     working_dir=sample.output_dir,
-                                     walltime="1:00:00",
-                                     email="ae",
-                                     deps=call_deps) # TODO: patient dependency
-            
-        call_deps.extend([job_id])
-        
-            
-                  
-    return config.JOB_SUCCESS
-
-
-def main():
-    logging.basicConfig(level=logging.DEBUG,
-                        format="%(asctime)s - %(name)s - %(levelname)s - %(message)s")
-    parser = argparse.ArgumentParser()
-    parser.add_argument("-p", type=int, dest="num_processors", default=1)
-    parser.add_argument("--keep-tmp", action="store_true", dest="keep_tmp", default=False)
-    parser.add_argument("--rm-fastq", action="store_true", dest="rm_fastq", default=False)
-    parser.add_argument("analysis_file")
-    parser.add_argument("config_file")
-    parser.add_argument("server_name")
-    args = parser.parse_args()
-    return run_analysis(args.analysis_file, args.config_file, 
-                        args.server_name, 
-                        num_processors=args.num_processors,
-                        keep_tmp=args.keep_tmp,
-                        rm_fastq=args.rm_fastq)
-    
-if __name__ == '__main__': 
-    sys.exit(main())
+    # Call somatic variants with varscan
+    #
+    msg = "Calling somatic SNVs with Varscan"
+    varscan_deps = []
+    if (up_to_date(grp.varscan_snv_file, benign_sample.merged_cleaned_bam_efile) and
+        up_to_date(grp.varscan_snv_file, tumor_sample.merged_cleaned_bam_efile)):
+        logging.info("[SKIPPED] %s" % msg)
+    else:
+        logging.info(msg)
+        args = [sys.executable, os.path.join(_exome_pipeline_dir, "snps_byVarScan_Somatic.py"),
+                "--varscan-dir", pipeline.varscan_dir,
+                os.path.join(server.references_dir, genome.get_path("genome_bwa_index")),
+                benign_sample.merged_cleaned_bam_efile,
+                tumor_sample.merged_cleaned_bam_efile,
+                grp.varscan_snv_file,
+                grp.varscan_indel_file]
+        log_stdout_file = os.path.join(log_dir, "varscan_snp_calling_stdout.log")
+        log_stderr_file = os.path.join(log_dir, "varscan_snp_calling_stderr.log")
+        logging.debug("\targs: %s" % (' '.join(map(str, args))))
+        job_id = submit_job_func("varscan_%s" % (grp.id), args,
+                                 num_processors=1,
+                                 node_processors=server.node_processors,
+                                 node_memory=server.node_mem,
+                                 pmem= int(round(float(server.node_mem)/2, 0)),
+                                 pbs_script_lines=server.pbs_script_lines,
+                                 working_dir=grp.output_dir,
+                                 walltime="60:00:00",
+                                 deps=sample_deps,
+                                 stdout_filename=log_stdout_file,
+                                 stderr_filename=log_stderr_file)
+        varscan_deps = [job_id]
+    #
+    # Running CNV analysis with Exome CNV
+    #
+    msg = "Calling CNVs with ExomeCNV"
+    cnv_deps = []
+    if (up_to_date(grp.exome_cnv_file, benign_sample.merged_cleaned_bam_efile) and
+        up_to_date(grp.exome_cnv_file, tumor_sample.merged_cleaned_bam_efile)):
+        logging.info("[SKIPPED] %s" % msg)
+    else:
+        logging.info(msg)
+        args = [sys.executable, os.path.join(_exome_pipeline_dir, "exomeCNV.py"),
+                pipeline.samtools_bin, 
+                pipeline.rscript_bin,
+                benign_sample.probe_summary_file,
+                tumor_sample.probe_summary_file,
+                grp.exome_loh_file,
+                grp.exome_cnv_file,
+                grp.exome_cnv_plot,
+                tumor_sample.merged_cleaned_bam_efile]
+        log_stderr_file = os.path.join(log_dir, "exome_cnv_calling_stderr.log")
+        log_stdout_file = os.path.join(log_dir, "exome_cnv_calling_stdout.log")
+        logging.debug("\targs: %s" % (' '.join(map(str, args))))
+        job_id = submit_job_func("cnv_%s" % (grp.id), args,
+                                 num_processors=1,
+                                 node_processors=server.node_processors,
+                                 node_memory=server.node_mem,
+                                 pbs_script_lines=server.pbs_script_lines,
+                                 working_dir=grp.output_dir,
+                                 walltime="24:00:00",
+                                 deps=sample_deps,
+                                 stdout_filename=log_stdout_file,
+                                 stderr_filename=log_stderr_file)
+        cnv_deps = [job_id]
+    # all dependencies for sample group
+    grp_deps = samtools_snv_deps + varscan_deps + cnv_deps
+    #
+    # write file indicating sample group jobs are complete
+    #
+    deps = grp_deps
+    msg = "Notifying user that sample group jobs are complete"
+    if os.path.exists(grp.job_complete_file) and (len(grp_deps) == 0):
+        logging.info("[SKIPPED]: %s" % msg)
+    else:
+        logging.info(msg)
+        args = [sys.executable, os.path.join(_oncoseq_pipeline_dir, "notify_complete.py"),
+                grp.job_complete_file]
+        job_id = submit_job_func("done_%s" % (grp.id), args,
+                                 num_processors=1,
+                                 node_processors=server.node_processors,
+                                 node_memory=server.node_mem,
+                                 pbs_script_lines=server.pbs_script_lines,
+                                 working_dir=grp.output_dir,
+                                 walltime="1:00:00",
+                                 email="ae",
+                                 deps=grp_deps)
+        deps = [job_id]
+    return deps

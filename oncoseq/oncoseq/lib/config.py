@@ -6,32 +6,28 @@ Created on Aug 3, 2011
 import os
 import logging
 import xml.etree.cElementTree as etree
-from collections import defaultdict
-from base import check_executable, indent_xml, file_exists_and_nz_size
-from seqdb import Patient, Sample, Library, Lane, FRAGMENT_LAYOUT_PAIRED
-from fragment_size_distribution import FragmentSizeDistribution
+
+from base import check_executable, indent_xml
+from seqdb import Patient, \
+    SAMPLE_TYPE_EXOME_TUMOR, SAMPLE_TYPE_EXOME_NORMAL, \
+    SAMPLE_TYPE_RNASEQ, SAMPLE_TYPE_CAPTURE_RNASEQ
+
+from oncoseq.rnaseq.lib import validate as validate_rnaseq 
 
 # job return codes
 JOB_SUCCESS = 0
 JOB_ERROR = 1
 
-# Protocols/analysis Folders
-EXOME = "exome"
-EXOME_DIR="exome"
-RNASEQ = "rnaseq"
-RNASEQ_DIR="rnaseq"
-RNASEQ_CAPTURE="capture_rnaseq"
-RNASEQ_CAPTURE_DIR="capture_rnaseq"
-
-# Protocols supported in oncoseq 
-VALID_PROTOCOLS={EXOME:EXOME_DIR,RNASEQ:RNASEQ_DIR,
-                 RNASEQ_CAPTURE:RNASEQ_CAPTURE_DIR}
-
+# XML files
+PATIENT_XML_FILE = "patient.xml"
+SAMPLE_GROUP_XML_FILE = "sample_group.xml"
+SAMPLE_XML_FILE = "sample.xml"
 
 # remote job constants
 REMOTE_ANALYSIS_XML_FILE = "analysis.xml"
 REMOTE_CONFIG_XML_FILE = "config.xml"
 REMOTE_CODE_TARGZ_FILE = "code.tar.gz"
+REMOTE_COPY_MAX_SIZE_BYTES = (8 << 30)
 
 # job file constants
 READ1_FASTQ_FILE = "read1.fq"
@@ -39,14 +35,9 @@ READ2_FASTQ_FILE = "read2.fq"
 FASTQ_FILES = (READ1_FASTQ_FILE, READ2_FASTQ_FILE)
 
 # fastqc
-FASTQC_READ1_DIR = "read1.fq_fastqc"
-FASTQC_READ1_DATA_FILE = os.path.join(FASTQC_READ1_DIR, 'fastqc_data.txt')
-FASTQC_READ1_REPORT_FILE = os.path.join(FASTQC_READ1_DIR, 'fastqc_report.html')
-FASTQC_READ2_DIR = "read2.fq_fastqc"
-FASTQC_READ2_DATA_FILE = os.path.join(FASTQC_READ2_DIR, 'fastqc_data.txt')
-FASTQC_READ2_REPORT_FILE = os.path.join(FASTQC_READ2_DIR, 'fastqc_report.html')
-FASTQC_DATA_FILES = [FASTQC_READ1_DATA_FILE, FASTQC_READ2_DATA_FILE]
-FASTQC_REPORT_FILES = [FASTQC_READ1_REPORT_FILE, FASTQC_READ2_REPORT_FILE]
+FASTQC_DIR_EXTENSION = "_fastqc"
+FASTQC_DATA_FILE = "fastqc_data.txt"
+FASTQC_REPORT_FILE = "fastqc_report.html"
 
 # abundant sequence mapping
 ABUNDANT_SAM_FILES = ('abundant_hits_read1.sam', 'abundant_hits_read2.sam')
@@ -66,10 +57,11 @@ SORTED_XENO_BAM_FILE = 'xeno_hits.srt.bam'
 FRAG_SIZE_DIST_FILE = "frag_size_dist.txt"
 FRAG_SIZE_DIST_PLOT_FILE = "frag_size_dist_plot.pdf"
 
+# TODO: remove chimerascan from pipeline
 # chimerascan gene fusion analysis
-CHIMERASCAN_DIR = 'chimerascan'
-CHIMERASCAN_RESULTS_FILE = 'chimeras.bedpe'
-CHIMERASCAN_MIN_SEGMENT_LENGTH = 25
+#CHIMERASCAN_DIR = 'chimerascan'
+#CHIMERASCAN_RESULTS_FILE = 'chimeras.bedpe'
+#CHIMERASCAN_MIN_SEGMENT_LENGTH = 25
 
 # tophat alignment results
 TOPHAT_DIR = 'tophat'
@@ -104,7 +96,7 @@ VARSCAN_VARIANT_IND_FILE = "varscan.indels.txt"
 TUMOR_COSMIC_VCF = "tumor_cosmic_positions.vcf"
 COSMIC_QUAL_VCF = "cov_cosmic_positions.vcf"
 
-# CNV results
+# cnv results
 CNV_FILE = "exome.cnvs.txt"
 LOH_FILE = "exome_loh.txt"
 CNV_PLOT = "exome_cnv_plot"
@@ -115,22 +107,21 @@ CUFFLINKS_TRANSCRIPTS_GTF_FILE = os.path.join(CUFFLINKS_DIR, "transcripts.gtf")
 CUFFLINKS_GENES_FILE = os.path.join(CUFFLINKS_DIR, "genes.fpkm_tracking")
 CUFFLINKS_ISOFORMS_FILE = os.path.join(CUFFLINKS_DIR, "isoforms.fpkm_tracking")
 
-
-# Files for EXOME analysis
+# files for exome analysis
 # alignment results
-ALIGNED_READS_SAM="aligned_reads.sam"
-ALIGNED_READS_BAM="aligned_reads.bam"
-ALIGNED_READS_BAM_TMP="aligned_reads_tmp.bam"
-ALIGNED_BAM_SORTED="aligned_reads_sorted.bam"
+ALIGNED_READS_SAM = "aligned_reads.sam"
+ALIGNED_READS_BAM = "aligned_reads.bam"
+ALIGNED_READS_BAM_TMP = "aligned_reads_tmp.bam"
+ALIGNED_BAM_SORTED = "aligned_reads_sorted.bam"
 # Merged BAM FILES
-MERGED_BAM_EFILE="merged_aligned.bam"
-MERGED_BAM_MDUP_EFILE="merged_aligned_mdup.bam"
-MERGED_CLEAN_BAM_EFILE="merged_aligned_clean.bam"
-
+MERGED_BAM_EFILE = "merged_aligned.bam"
+MERGED_BAM_MDUP_EFILE = "merged_aligned_mdup.bam"
+MERGED_CLEAN_BAM_EFILE = "merged_aligned_clean.bam"
 # coverage
-EXOME_COVERAGE="coverage_exome.cov"
-PROBE_COVERAGE="coverage_probes.cov"
-PROBE_COVERAGE_SUMMARY="probes_coverage_summary.cov"
+EXOME_COVERAGE = "coverage_exome.cov"
+PROBE_COVERAGE = "coverage_probes.cov"
+PROBE_COVERAGE_SUMMARY = "probes_coverage_summary.cov"
+
 # job complete
 JOB_COMPLETE_FILE = "job.done"
 
@@ -146,397 +137,243 @@ def get_picard_strand_specificity(strand_protocol):
     else:
         return "NONE"
 
-
-def attach_patient_to_results(patient, samples, root_dir):
-    patient.output_dir = os.path.join(root_dir, patient.id)
-    patient.exome_dir=os.path.join(patient.output_dir,EXOME_DIR)
-    patient.rnaseq_dir=os.path.join(patient.output_dir,RNASEQ_DIR)
-    patient.capture_rnaseq_dir=os.path.join(patient.output_dir,RNASEQ_CAPTURE_DIR)
-    
-    # SNV output files
-    patient.job_complete_file = os.path.join(patient.output_dir, JOB_COMPLETE_FILE)
-    patient.samtools_bcf_file = os.path.join(patient.exome_dir, SAMTOOLS_VARIANT_BCF_FILE)
-    patient.samtools_vcf_file = os.path.join(patient.exome_dir, SAMTOOLS_VARIANT_VCF_FILE)
-    patient.varscan_snv_file = os.path.join(patient.exome_dir, VARSCAN_VARIANT_SNV_FILE)
-    patient.varscan_indel_file = os.path.join(patient.exome_dir, VARSCAN_VARIANT_IND_FILE)        
-    patient.tumor_cosmic_file = os.path.join(patient.exome_dir,TUMOR_COSMIC_VCF)
-    patient.exome_cnv_file = os.path.join(patient.exome_dir,CNV_FILE)
-    patient.exome_loh_file = os.path.join(patient.exome_dir,LOH_FILE)
-    patient.exome_cnv_plot = os.path.join(patient.exome_dir,CNV_PLOT)
-
-    # Include GATK files
-    
-    # attach samples to results
-    attach_sample_to_results(samples, patient.output_dir)
-    
-
-def attach_sample_to_results(samples, root_dir):        
-    
-    for sample in samples:
-        
-        protocol_path = os.path.join(root_dir,VALID_PROTOCOLS[sample.protocol])
-        sample.output_dir = os.path.join(protocol_path, sample.id)
-        sample.job_complete_file = os.path.join(sample.output_dir, JOB_COMPLETE_FILE)
-
-        # Files for EXOME output
-        sample.merged_bam_efile = os.path.join(sample.output_dir, MERGED_BAM_EFILE)   
-        sample.merged_bam_mdup_efile= os.path.join(sample.output_dir, MERGED_BAM_MDUP_EFILE)
-        sample.merged_cleaned_bam_efile = os.path.join(sample.output_dir, MERGED_CLEAN_BAM_EFILE)
-        sample.cosmic_qual_vcf_file = os.path.join(sample.output_dir, COSMIC_QUAL_VCF)
-        sample.exome_coverage_file = os.path.join(sample.output_dir,EXOME_COVERAGE)
-        sample.probe_coverage_file = os.path.join(sample.output_dir,PROBE_COVERAGE)
-        sample.probe_summary_file = os.path.join(sample.output_dir,PROBE_COVERAGE_SUMMARY)
-        sample.coverage_bedgraph_file = os.path.join(sample.output_dir,COVERAGE_BEDGRAPH_FILE)
-        sample.coverage_bigwig_file = os.path.join(sample.output_dir,COVERAGE_BIGWIG_FILE)
-        
-        # attach libraries to results
-        attach_library_to_results(sample, sample.output_dir)
-        
-
-def attach_library_to_results(sample, root_dir):
-        
-    for library in sample.libraries:
-        library.output_dir = os.path.join(sample.output_dir, library.id)
-        # merged fragment size distribution
-        library.merged_frag_size_dist_file = os.path.join(library.output_dir, MERGED_FRAG_SIZE_DIST_FILE)
-        # merged BAM file
-        library.merged_bam_file = os.path.join(library.output_dir, MERGED_BAM_FILE)   
-        library.merged_cleaned_bam_file = os.path.join(library.output_dir, MERGED_CLEAN_BAM_FILE)
-        
-        # Files for EXOME output
-        library.merged_bam_efile = os.path.join(library.output_dir, MERGED_BAM_EFILE)   
-        library.merged_bam_mdup_efile= os.path.join(library.output_dir, MERGED_BAM_MDUP_EFILE)
-        library.merged_cleaned_bam_efile = os.path.join(library.output_dir, MERGED_CLEAN_BAM_EFILE)
-
-        # rnaseq SNP calling files
-        library.samtools_bcf_file = os.path.join(library.output_dir, SAMTOOLS_VARIANT_BCF_FILE)
-        library.samtools_vcf_file = os.path.join(library.output_dir, SAMTOOLS_VARIANT_VCF_FILE)
-        library.varscan_snv_file = os.path.join(library.output_dir, VARSCAN_VARIANT_SNV_FILE)
-        library.varscan_indel_file = os.path.join(library.output_dir, VARSCAN_VARIANT_IND_FILE)        
-        
-        
-        # Cufflinks output files
-        library.cufflinks_dir = os.path.join(library.output_dir, CUFFLINKS_DIR)
-        library.cufflinks_gtf_file = os.path.join(library.output_dir, CUFFLINKS_TRANSCRIPTS_GTF_FILE)
-        library.cufflinks_genes_fpkm_file = os.path.join(library.output_dir, CUFFLINKS_GENES_FILE)
-        library.cufflinks_isoforms_fpkm_file = os.path.join(library.output_dir, CUFFLINKS_ISOFORMS_FILE)
-        
-        # lane results
-        for lane in library.lanes:
-            lane.output_dir = os.path.join(library.output_dir, lane.id)
-            # FASTQ files
-            lane.fastq_files = [lane.read1_file]
-            lane.copied_fastq_files = [os.path.join(lane.output_dir, READ1_FASTQ_FILE)]
-            if lane.read2_file is not None:
-                lane.fastq_files.append(lane.read2_file)
-                lane.copied_fastq_files.append(os.path.join(lane.output_dir, READ2_FASTQ_FILE))
-            # FASTQC results
-            lane.fastqc_data_files = []
-            lane.fastqc_report_files = []
-            for readnum in xrange(len(lane.copied_fastq_files)):
-                lane.fastqc_data_files.append(os.path.join(lane.output_dir, FASTQC_DATA_FILES[readnum]))
-                lane.fastqc_report_files.append(os.path.join(lane.output_dir, FASTQC_REPORT_FILES[readnum]))
-            # Abundant SAM files
-            lane.abundant_sam_files = []
-            for readnum in xrange(len(lane.copied_fastq_files)):
-                lane.abundant_sam_files.append(os.path.join(lane.output_dir, ABUNDANT_SAM_FILES[readnum]))
-            # Filtered abundant BAM and FASTQ
-            lane.abundant_bam_file = os.path.join(lane.output_dir, ABUNDANT_BAM_FILE)
-            lane.filtered_fastq_files = []
-            for readnum in xrange(len(lane.copied_fastq_files)):
-                lane.filtered_fastq_files.append(os.path.join(lane.output_dir, FILTERED_FASTQ_FILES[readnum]))
-            # chimerascan results
-            lane.chimerascan_dir = os.path.join(lane.output_dir, CHIMERASCAN_DIR)
-            lane.chimerascan_results_file = os.path.join(lane.chimerascan_dir, CHIMERASCAN_RESULTS_FILE)
-            # Sorted abundant reads bam file
-            lane.sorted_abundant_bam_file = os.path.join(lane.output_dir, SORTED_ABUNDANT_BAM_FILE)
-            # Contaminant foreign organism (xeno) SAM files
-            lane.xeno_sam_files = []
-            for readnum in xrange(len(lane.copied_fastq_files)):
-                lane.xeno_sam_files.append(os.path.join(lane.output_dir, XENO_SAM_FILES[readnum]))
-            # Contaminant foreign organism BAM files
-            lane.xeno_bam_file = os.path.join(lane.output_dir, XENO_BAM_FILE)
-            lane.sorted_xeno_bam_file = os.path.join(lane.output_dir, SORTED_XENO_BAM_FILE)
-            # Fragment size distribution
-            lane.frag_size_dist_file = os.path.join(lane.output_dir, FRAG_SIZE_DIST_FILE)
-            lane.frag_size_dist_plot_file = os.path.join(lane.output_dir, FRAG_SIZE_DIST_PLOT_FILE)
-            # Align reads with tophat
-            lane.tophat_dir = os.path.join(lane.output_dir, TOPHAT_DIR)
-            lane.tophat_bam_file = os.path.join(lane.output_dir, TOPHAT_BAM_FILE)
-            lane.tophat_juncs_file = os.path.join(lane.output_dir, TOPHAT_JUNCTIONS_FILE)
-            # Picard metrics
-            lane.alignment_summary_metrics = os.path.join(lane.output_dir, LANE_ALIGNMENT_SUMMARY_METRICS)
-            lane.insert_size_histogram_pdf = os.path.join(lane.output_dir, LANE_INSERT_SIZE_HISTOGRAM_PDF)
-            lane.insert_size_metrics = os.path.join(lane.output_dir, LANE_INSERT_SIZE_METRICS)
-            lane.quality_by_cycle_metrics = os.path.join(lane.output_dir, LANE_QUALITY_BY_CYCLE_METRICS)
-            lane.quality_by_cycle_pdf = os.path.join(lane.output_dir, LANE_QUALITY_BY_CYCLE_PDF)
-            lane.quality_distribution_metrics = os.path.join(lane.output_dir, LANE_QUALITY_DISTRIBUTION_METRICS)
-            lane.quality_distribution_pdf = os.path.join(lane.output_dir, LANE_QUALITY_DISTRIBUTION_PDF)
-            lane.rnaseq_metrics = os.path.join(lane.output_dir, LANE_RNASEQ_METRICS)
-            lane.rnaseq_metrics_pdf = os.path.join(lane.output_dir, LANE_RNASEQ_METRICS_PLOT_PDF)
-            
-            # Coverage file
-            lane.coverage_bedgraph_file = os.path.join(lane.output_dir, COVERAGE_BEDGRAPH_FILE)
-            # Bigwig file
-            lane.coverage_bigwig_file = os.path.join(lane.output_dir, COVERAGE_BIGWIG_FILE)
-            
-            # EXOME alignment files
-            lane.exome_sam_aln = os.path.join(lane.output_dir, ALIGNED_READS_SAM)
-            lane.exome_bam_aln = os.path.join(lane.output_dir, ALIGNED_READS_BAM)
-            lane.exome_bam_tmp = os.path.join(lane.output_dir, ALIGNED_READS_BAM_TMP)
-            lane.exome_bam_sorted = os.path.join(lane.output_dir, ALIGNED_BAM_SORTED)
-
-def check_tophat_juncs_file(filename):
-    if not file_exists_and_nz_size(filename):
-        return False
-    lines = 0
-    for line in open(filename):
-        if not line or line.startswith("track"):
-            continue
-        lines += 1
-        if lines > 100:
-            return True
-    return lines > 0
-
-def check_sam_file(filename, isbam=False):
-    is_valid = True
-    if not file_exists_and_nz_size(filename):
-        is_valid = False
-    else:
-        import pysam
-        try:
-            fmt = "rb" if isbam else "r"
-            samfh = pysam.Samfile(filename, fmt)
-            samfh.close()   
-        except:
-            is_valid = False
-    return is_valid
-
-def check_frag_size_dist_file(filename):
-    is_valid=True
-    if not file_exists_and_nz_size(filename):
-        is_valid = False
-    else:
-        try:
-            frag_size_dist = FragmentSizeDistribution.from_file(open(filename))
-        except:
-            is_valid = False    
-    return is_valid
-
-def validate_lane_results(lane):
-    is_valid = True
-    # check FASTQC results
-    for f in lane.fastqc_data_files:
-        if not file_exists_and_nz_size(f):
-            logging.error("Lane %s missing fastqc data file %s" % (lane.id, f))
-            is_valid = False
-    for f in lane.fastqc_report_files:
-        if not file_exists_and_nz_size(f):
-            logging.error("Lane %s missing fastqc report file %s" % (lane.id, f))
-            is_valid = False
-    # check sorted abundant reads bam file
-    if not check_sam_file(lane.sorted_abundant_bam_file, isbam=True):
-        logging.error("Lane %s missing/corrupt abundant reads BAM file" % (lane.id))
-        is_valid = False
-    # check chimerascan results (only run chimerascan for paired-end reads)    
-    if ((len(lane.filtered_fastq_files) > 1) and 
-        (not file_exists_and_nz_size(lane.chimerascan_results_file))):
-        logging.error("Lane %s missing/corrupt chimerascan results file" % (lane.id))
-        is_valid = False
-    # check sorted foreign sequence bam file
-    if not check_sam_file(lane.sorted_xeno_bam_file, isbam=True):
-        logging.error("Lane %s missing/corrupt foreign sequences BAM file" % (lane.id))
-        is_valid = False
-    # check fragment size distribution
-    if not check_frag_size_dist_file(lane.frag_size_dist_file):
-        logging.error("Lane %s missing/corrupt fragment size distribution" % (lane.id))
-        is_valid = False
-    # check tophat junctions file
-    if not file_exists_and_nz_size(lane.tophat_juncs_file):
-        logging.error("Lane %s missing/empty tophat junctions file" % (lane.id))
-        is_valid = False
-    # check tophat bam file
-    if not check_sam_file(lane.tophat_bam_file, isbam=True):
-        logging.error("Lane %s missing/corrupt tophat BAM file" % (lane.id))
-        is_valid = False
-    # check picard summary metrics
-    if not file_exists_and_nz_size(lane.alignment_summary_metrics):
-        logging.error("Lane %s missing picard alignment summary metrics" % (lane.id))
-        is_valid = False
-    if ((lane.fragment_layout == FRAGMENT_LAYOUT_PAIRED) and 
-        (not file_exists_and_nz_size(lane.insert_size_metrics))):
-        logging.error("Lane %s missing picard insert size metrics" % (lane.id))
-        is_valid = False
-    if not file_exists_and_nz_size(lane.quality_by_cycle_metrics):
-        logging.error("Lane %s missing picard quality by cycle metrics" % (lane.id))
-        is_valid = False
-    if not file_exists_and_nz_size(lane.quality_distribution_metrics):
-        logging.error("Lane %s missing picard quality distribution metrics" % (lane.id))
-        is_valid = False
-    if not file_exists_and_nz_size(lane.rnaseq_metrics):
-        logging.error("Lane %s missing picard rnaseq metrics" % (lane.id))
-        is_valid = False
-    # check coverage files
-    if not file_exists_and_nz_size(lane.coverage_bigwig_file):
-        logging.error("Lane %s missing coverage bigwig file" % (lane.id))
-        is_valid = False
-    return is_valid
-
-def validate_library_results(library):
-    is_valid = True
-    # validate child lanes
+def attach_exome_library_to_results(library, root_dir):
+    library.output_dir = os.path.join(root_dir, library.id)
+    # merged alignment files
+    library.merged_bam_efile = os.path.join(library.output_dir, MERGED_BAM_EFILE)   
+    library.merged_bam_mdup_efile= os.path.join(library.output_dir, MERGED_BAM_MDUP_EFILE)
+    library.merged_cleaned_bam_efile = os.path.join(library.output_dir, MERGED_CLEAN_BAM_EFILE)
+    # lane results
     for lane in library.lanes:
-        is_valid = is_valid and validate_lane_results(lane)
-    # check merged fragment size distribution file
-    if not check_frag_size_dist_file(library.merged_frag_size_dist_file):
-        logging.error("Library %s missing/corrupt fragment size distribution" % (library.id))
-        is_valid = False
-    # check merged BAM file
-    if not check_sam_file(library.merged_bam_file, isbam=True):
-        logging.error("Library %s missing/corrupt tophat BAM file" % (library.id))
-        is_valid = False
-    # check cufflinks files
-    if not file_exists_and_nz_size(library.cufflinks_gtf_file):
-        logging.error("Library %s missing cufflinks gtf file" % (library.id))
-        is_valid = False
-    # check snp files from samtools
-    if not file_exists_and_nz_size(library.samtools_vcf_file):
-        logging.error("Library %s missing samtools variant vcf file" % (library.id))
-        is_valid = False
-    # check snp files from varascan
-    if not file_exists_and_nz_size(library.varscan_snv_file):
-        logging.error("Library %s missing varscan snv file" % (library.id))
-        is_valid = False
-    return is_valid
+        lane.output_dir = os.path.join(library.output_dir, lane.id)
+        # FASTQ files
+        lane.fastq_files = [lane.read1_file]
+        lane.copied_fastq_files = [os.path.join(lane.output_dir, READ1_FASTQ_FILE)]
+        if lane.read2_file is not None:
+            lane.fastq_files.append(lane.read2_file)
+            lane.copied_fastq_files.append(os.path.join(lane.output_dir, READ2_FASTQ_FILE))
+        # FASTQC results
+        lane.fastqc_data_files = []
+        lane.fastqc_report_files = []
+        for readnum in xrange(len(lane.copied_fastq_files)):
+            fastqc_dir = os.path.join(lane.output_dir, "%s%s" % (os.path.basename(lane.fastq_files[readnum]), FASTQC_DIR_EXTENSION))
+            lane.fastqc_data_files.append(os.path.join(fastqc_dir, FASTQC_DATA_FILE))
+            lane.fastqc_report_files.append(os.path.join(fastqc_dir, FASTQC_REPORT_FILE))
+        # EXOME alignment files
+        lane.exome_sam_aln = os.path.join(lane.output_dir, ALIGNED_READS_SAM)
+        lane.exome_bam_aln = os.path.join(lane.output_dir, ALIGNED_READS_BAM)
+        lane.exome_bam_tmp = os.path.join(lane.output_dir, ALIGNED_READS_BAM_TMP)
+        lane.exome_bam_sorted = os.path.join(lane.output_dir, ALIGNED_BAM_SORTED)
 
-def validate_sample_results(sample):
-    is_valid = True
+def attach_exome_sample_to_results(sample, root_dir):    
+    sample.output_dir = os.path.join(root_dir, sample.id)
+    sample.job_complete_file = os.path.join(sample.output_dir, JOB_COMPLETE_FILE)
+    sample.xml_file = os.path.join(sample.output_dir, SAMPLE_XML_FILE)
+    # output files produced by exome pipeline
+    sample.merged_bam_efile = os.path.join(sample.output_dir, MERGED_BAM_EFILE)   
+    sample.merged_bam_mdup_efile= os.path.join(sample.output_dir, MERGED_BAM_MDUP_EFILE)
+    sample.merged_cleaned_bam_efile = os.path.join(sample.output_dir, MERGED_CLEAN_BAM_EFILE)
+    sample.cosmic_qual_vcf_file = os.path.join(sample.output_dir, COSMIC_QUAL_VCF)
+    sample.exome_coverage_file = os.path.join(sample.output_dir, EXOME_COVERAGE)
+    sample.probe_coverage_file = os.path.join(sample.output_dir, PROBE_COVERAGE)
+    sample.probe_summary_file = os.path.join(sample.output_dir, PROBE_COVERAGE_SUMMARY)
+    sample.coverage_bedgraph_file = os.path.join(sample.output_dir, COVERAGE_BEDGRAPH_FILE)
+    sample.coverage_bigwig_file = os.path.join(sample.output_dir, COVERAGE_BIGWIG_FILE)      
+    # attach libraries to results
     for library in sample.libraries:
-        is_valid = is_valid and validate_library_results(library)
+        attach_exome_library_to_results(library, sample.output_dir)
+
+
+def attach_rnaseq_library_to_results(library, root_dir):
+    library.output_dir = os.path.join(root_dir, library.id)
+    # merged fragment size distribution
+    library.merged_frag_size_dist_file = os.path.join(library.output_dir, MERGED_FRAG_SIZE_DIST_FILE)
+    # merged BAM file
+    library.merged_bam_file = os.path.join(library.output_dir, MERGED_BAM_FILE)   
+    library.merged_cleaned_bam_file = os.path.join(library.output_dir, MERGED_CLEAN_BAM_FILE)   
+    # rnaseq SNP calling files
+    library.samtools_bcf_file = os.path.join(library.output_dir, SAMTOOLS_VARIANT_BCF_FILE)
+    library.samtools_vcf_file = os.path.join(library.output_dir, SAMTOOLS_VARIANT_VCF_FILE)
+    library.varscan_snv_file = os.path.join(library.output_dir, VARSCAN_VARIANT_SNV_FILE)
+    library.varscan_indel_file = os.path.join(library.output_dir, VARSCAN_VARIANT_IND_FILE)    
+    # Cufflinks output files
+    library.cufflinks_dir = os.path.join(library.output_dir, CUFFLINKS_DIR)
+    library.cufflinks_gtf_file = os.path.join(library.output_dir, CUFFLINKS_TRANSCRIPTS_GTF_FILE)
+    library.cufflinks_genes_fpkm_file = os.path.join(library.output_dir, CUFFLINKS_GENES_FILE)
+    library.cufflinks_isoforms_fpkm_file = os.path.join(library.output_dir, CUFFLINKS_ISOFORMS_FILE)  
+    # lane results
+    for lane in library.lanes:
+        lane.output_dir = os.path.join(library.output_dir, lane.id)
+        # FASTQ files
+        lane.fastq_files = [lane.read1_file]
+        lane.copied_fastq_files = [os.path.join(lane.output_dir, READ1_FASTQ_FILE)]
+        if lane.read2_file is not None:
+            lane.fastq_files.append(lane.read2_file)
+            lane.copied_fastq_files.append(os.path.join(lane.output_dir, READ2_FASTQ_FILE))
+        # FASTQC results
+        lane.fastqc_data_files = []
+        lane.fastqc_report_files = []
+        for readnum in xrange(len(lane.fastq_files)):
+            fastqc_dir = os.path.join(lane.output_dir, "%s%s" % (os.path.basename(lane.fastq_files[readnum]), FASTQC_DIR_EXTENSION))
+            lane.fastqc_data_files.append(os.path.join(fastqc_dir, FASTQC_DATA_FILE))
+            lane.fastqc_report_files.append(os.path.join(fastqc_dir, FASTQC_REPORT_FILE))
+        # Abundant SAM files
+        lane.abundant_sam_files = []
+        for readnum in xrange(len(lane.copied_fastq_files)):
+            lane.abundant_sam_files.append(os.path.join(lane.output_dir, ABUNDANT_SAM_FILES[readnum]))
+        # Filtered abundant BAM and FASTQ
+        lane.abundant_bam_file = os.path.join(lane.output_dir, ABUNDANT_BAM_FILE)
+        lane.filtered_fastq_files = []
+        for readnum in xrange(len(lane.copied_fastq_files)):
+            lane.filtered_fastq_files.append(os.path.join(lane.output_dir, FILTERED_FASTQ_FILES[readnum]))
+        # TODO: remove chimerascan
+        # chimerascan results
+        #lane.chimerascan_dir = os.path.join(lane.output_dir, CHIMERASCAN_DIR)
+        #lane.chimerascan_results_file = os.path.join(lane.chimerascan_dir, CHIMERASCAN_RESULTS_FILE)
+        # Sorted abundant reads bam file
+        lane.sorted_abundant_bam_file = os.path.join(lane.output_dir, SORTED_ABUNDANT_BAM_FILE)
+        # Contaminant foreign organism (xeno) SAM files
+        lane.xeno_sam_files = []
+        for readnum in xrange(len(lane.copied_fastq_files)):
+            lane.xeno_sam_files.append(os.path.join(lane.output_dir, XENO_SAM_FILES[readnum]))
+        # Contaminant foreign organism BAM files
+        lane.xeno_bam_file = os.path.join(lane.output_dir, XENO_BAM_FILE)
+        lane.sorted_xeno_bam_file = os.path.join(lane.output_dir, SORTED_XENO_BAM_FILE)
+        # Fragment size distribution
+        lane.frag_size_dist_file = os.path.join(lane.output_dir, FRAG_SIZE_DIST_FILE)
+        lane.frag_size_dist_plot_file = os.path.join(lane.output_dir, FRAG_SIZE_DIST_PLOT_FILE)
+        # Align reads with tophat
+        lane.tophat_dir = os.path.join(lane.output_dir, TOPHAT_DIR)
+        lane.tophat_bam_file = os.path.join(lane.output_dir, TOPHAT_BAM_FILE)
+        lane.tophat_juncs_file = os.path.join(lane.output_dir, TOPHAT_JUNCTIONS_FILE)
+        # Picard metrics
+        lane.alignment_summary_metrics = os.path.join(lane.output_dir, LANE_ALIGNMENT_SUMMARY_METRICS)
+        lane.insert_size_histogram_pdf = os.path.join(lane.output_dir, LANE_INSERT_SIZE_HISTOGRAM_PDF)
+        lane.insert_size_metrics = os.path.join(lane.output_dir, LANE_INSERT_SIZE_METRICS)
+        lane.quality_by_cycle_metrics = os.path.join(lane.output_dir, LANE_QUALITY_BY_CYCLE_METRICS)
+        lane.quality_by_cycle_pdf = os.path.join(lane.output_dir, LANE_QUALITY_BY_CYCLE_PDF)
+        lane.quality_distribution_metrics = os.path.join(lane.output_dir, LANE_QUALITY_DISTRIBUTION_METRICS)
+        lane.quality_distribution_pdf = os.path.join(lane.output_dir, LANE_QUALITY_DISTRIBUTION_PDF)
+        lane.rnaseq_metrics = os.path.join(lane.output_dir, LANE_RNASEQ_METRICS)
+        lane.rnaseq_metrics_pdf = os.path.join(lane.output_dir, LANE_RNASEQ_METRICS_PLOT_PDF)
+        # Coverage file
+        lane.coverage_bedgraph_file = os.path.join(lane.output_dir, COVERAGE_BEDGRAPH_FILE)
+        # Bigwig file
+        lane.coverage_bigwig_file = os.path.join(lane.output_dir, COVERAGE_BIGWIG_FILE)
+
+def attach_rnaseq_sample_to_results(sample, root_dir):    
+    sample.output_dir = os.path.join(root_dir, sample.id)
+    sample.job_complete_file = os.path.join(sample.output_dir, JOB_COMPLETE_FILE)
+    sample.xml_file = os.path.join(sample.output_dir, SAMPLE_XML_FILE)
+    # attach libraries to results
+    for library in sample.libraries:
+        attach_rnaseq_library_to_results(library, sample.output_dir)
+
+def attach_sample_group_to_results(grp, root_dir):
+    grp.output_dir = os.path.join(root_dir, grp.id)
+    grp.job_complete_file = os.path.join(grp.output_dir, JOB_COMPLETE_FILE)
+    grp.xml_file = os.path.join(grp.output_dir, SAMPLE_GROUP_XML_FILE)
+    # output files produced by exome pipeline
+    grp.samtools_bcf_file = os.path.join(grp.output_dir, SAMTOOLS_VARIANT_BCF_FILE)
+    grp.samtools_vcf_file = os.path.join(grp.output_dir, SAMTOOLS_VARIANT_VCF_FILE)
+    grp.varscan_snv_file = os.path.join(grp.output_dir, VARSCAN_VARIANT_SNV_FILE)
+    grp.varscan_indel_file = os.path.join(grp.output_dir, VARSCAN_VARIANT_IND_FILE)        
+    grp.tumor_cosmic_file = os.path.join(grp.output_dir, TUMOR_COSMIC_VCF)
+    grp.exome_cnv_file = os.path.join(grp.output_dir, CNV_FILE)
+    grp.exome_loh_file = os.path.join(grp.output_dir, LOH_FILE)
+    grp.exome_cnv_plot = os.path.join(grp.output_dir, CNV_PLOT)
+    # attach samples to results
+    for sample_type, sample in grp.samples.iteritems():
+        if sample is None:
+            continue
+        if ((sample_type == SAMPLE_TYPE_EXOME_TUMOR) or
+            (sample_type == SAMPLE_TYPE_EXOME_NORMAL)):
+            attach_exome_sample_to_results(sample, grp.output_dir)
+        else:
+            attach_rnaseq_sample_to_results(sample, grp.output_dir)
+
+def attach_patient_to_results(patient, root_dir):
+    patient.output_dir = os.path.join(root_dir, patient.id)
+    patient.job_complete_file = os.path.join(patient.output_dir, JOB_COMPLETE_FILE)
+    patient.xml_file = os.path.join(patient.output_dir, PATIENT_XML_FILE)
+    for grp in patient.sample_groups.itervalues():
+        attach_sample_group_to_results(grp, patient.output_dir)
+
+def validate_patient_results(patient):
+    is_valid = True
+    for grp in patient.sample_groups.itervalues():
+        for sample_type, sample in grp.samples.iteritems():
+            if ((sample_type == SAMPLE_TYPE_RNASEQ) or
+                (sample_type == SAMPLE_TYPE_CAPTURE_RNASEQ)):
+                is_valid = is_valid and validate_rnaseq.validate_sample_results(sample)
     return is_valid
 
 class AnalysisConfig(object):
+
     @staticmethod
     def from_xml(xmlfile):
         tree = etree.parse(xmlfile)        
         root = tree.getroot()
-        c = AnalysisConfig()
-        c.patients = defaultdict(list)
-        c.samples = []
-        c.species = set() 
-        
+        c = AnalysisConfig()        
+        c.patients = []
         # read patients
-        # TODO extend to multiples patients by analysis file. Usually one patient by analysis file
         for patient_elem in root.findall("patient"):
-            patient = Patient.from_xml(patient_elem)
-            c.species.add(patient.species)             
-            #c.patients.append(patient)
-            
-            # read samples
-            for sample_elem in patient_elem.findall("sample"):
-                sample = Sample.from_xml(sample_elem)
-                c.samples.append(sample)
-                c.patients[patient].append(sample)
-                
-                for lib_elem in sample_elem.findall("library"):
-                    lib = Library.from_xml(lib_elem)
-                    lib.sample = sample
-                    sample.libraries.append(lib)
-                    for lane_elem in lib_elem.findall("lane"):
-                        lane = Lane.from_xml(lane_elem)
-                        lane.library = lib
-                        lib.lanes.append(lane)
-        
-        if len(c.species) > 1:
-            logging.error("Analysis include different species" % (patient.id))
-        else:
-            c.species=list(c.species)[0]
-            
+            c.patients.append(Patient.from_xml(patient_elem))
         return c
     
     def to_xml(self, output_file):
         root = etree.Element("analysis")
-        # add patient species, gender age
-        '''
-        elem = etree.SubElement(root, "id")
-        elem.text = self.patient.id
-        elem = etree.SubElement(root, "species")
-        elem.text = self.species
-        elem = etree.SubElement(root, "gender")
-        elem.text = self.gender
-        elem = etree.SubElement(root, "age")
-        elem.text = self.age
-        '''
-        # add samples
         for patient in self.patients:
-            patient_elem = patient.to_xml(root)
-            for sample in self.samples:
-                sample_elem = sample.to_xml(patient_elem)
-                for library in sample.libraries:
-                    lib_elem = library.to_xml(sample_elem)
-                    for lane in library.lanes:
-                        lane.to_xml(lib_elem)
-        f = open(output_file, "w")
+            patient.to_xml(root)
         # indent for pretty printing
         indent_xml(root)
+        # write to file
+        f = open(output_file, "w")
         print >>f, etree.tostring(root)
         f.close()            
     
     def is_valid(self):
         valid = True
-        for sample in self.samples:
-            valid = sample.is_valid() 
-            for library in sample.libraries:        
-                valid = library.is_valid() 
-                for lane in library.lanes:
-                    valid = lane.is_valid() 
+        for patient in self.patients:
+            valid = valid and patient.is_valid()
         return valid
     
     def attach_to_results(self, root_dir):
-        
-        # Modified from the original folder structure
-        for patient, samples in self.patients.iteritems():
-            attach_patient_to_results(patient, samples, root_dir)
-    
+        for patient in self.patients:            
+            attach_patient_to_results(patient, root_dir)
+            
+    def validate_results(self):
+        for patient in self.patients:            
+            validate_patient_results(patient)
 
 class GenomeConfig(object):
+    __fields__ = ("root_dir",
+                  "abundant_bowtie_index",
+                  "xeno_bowtie_index",
+                  "genome_bowtie_index",
+                  "genome_bowtie2_index",
+                  "genome_fasta_file",
+                  "genome_bwa_index",
+                  "fragment_size_bowtie_index",
+                  "gene_annotation_refflat",
+                  "picard_ribosomal_intervals",
+                  "chrom_sizes",
+                  "cosmic_positions",
+                  "capture_roche",
+                  "capture_agilent",
+                  "exome_bed_file")
+    
     @staticmethod
     def from_xml_elem(elem):
         g = GenomeConfig()
         g.species = elem.get("name")
-        for attrname in ("root_dir",
-                         "abundant_bowtie_index",
-                         "xeno_bowtie_index",
-                         "genome_bowtie_index",
-                         "genome_fasta_file",
-                         "genome_bwa_index",
-                         "fragment_size_bowtie_index",
-                         "gene_annotation_refflat",
-                         "picard_ribosomal_intervals",
-                         "chrom_sizes",
-                         "cosmic_positions",
-                         "capture_roche",
-                         "capture_agilent",
-                         "exome_bed_file"):
+        for attrname in GenomeConfig.__fields__:
             setattr(g, attrname, elem.findtext(attrname))
         return g
 
     def to_xml(self, root):
         root.set("name", self.species)
-        for attrname in ("root_dir",
-                         "abundant_bowtie_index",
-                         "xeno_bowtie_index",
-                         "genome_bowtie_index",
-                         "genome_fasta_file",
-                         "genome_bwa_index",
-                         "fragment_size_bowtie_index",
-                         "gene_annotation_refflat",
-                         "picard_ribosomal_intervals",
-                         "chrom_sizes",
-                         "cosmic_positions",
-                         "capture_roche",
-                         "capture_agilent",
-                         "exome_bed_file"):
+        for attrname in GenomeConfig.__fields__:
             elem = etree.SubElement(root, attrname)
             elem.text = str(getattr(self, attrname))            
 
@@ -561,14 +398,15 @@ class GenomeConfig(object):
         if not os.path.exists(os.path.join(abs_root_dir, self.genome_bowtie_index + ".1.ebwt")):
             logging.error("Genome bowtie index %s not found" % (self.genome_bowtie_index))
             valid = False
+        if not os.path.exists(os.path.join(abs_root_dir, self.genome_bowtie2_index + ".1.bt2")):
+            logging.error("Genome bowtie2 index %s not found" % (self.genome_bowtie2_index))
+            valid = False
         if not os.path.exists(os.path.join(abs_root_dir, self.fragment_size_bowtie_index + ".1.ebwt")):
             logging.error("Fragment size bowtie index %s not found" % (self.fragment_size_bowtie_index))
             valid = False
         if not os.path.join(abs_root_dir, self.genome_bwa_index + ".bwt"):
             logging.error("Genome BWA index %s not found" % (self.genome_bwa_index))
             valid = False
-        
-
         for attrname in ("genome_fasta_file",
                          "gene_annotation_refflat",
                          "picard_ribosomal_intervals",
@@ -656,41 +494,44 @@ class ServerConfig(object):
             valid = False
         return valid    
 
-class ChimerascanConfig(object):
-    @staticmethod
-    def from_xml_elem(elem):
-        c = ChimerascanConfig()
-        for attrname in ("index", "trim5", "trim3", "frag_size_percentile"):
-            setattr(c, attrname, elem.findtext(attrname))
-        c.args = []
-        for arg_elem in elem.findall("arg"):
-            c.args.append(arg_elem.text)
-        return c
-    
-    def to_xml(self, root):
-        for attrname in ("index", "trim5", "trim3", "frag_size_percentile"):
-            attrval = getattr(self,attrname)
-            if attrval is not None:
-                elem = etree.SubElement(root, attrname)
-                elem.text = str(attrval)
-        for arg in self.args:
-            elem = etree.SubElement(root, "arg")
-            elem.text = arg            
-
-    def is_valid(self, species_dir):
-        valid = True
-        species_sub = lambda arg: arg.replace("${SPECIES}", species_dir)
-        newindex = species_sub(self.index)
-        if not os.path.exists(newindex):
-            logging.error("File not found: %s" % (newindex))
-            valid = False
-        return valid   
+# TODO: remove chimerascan?
+#class ChimerascanConfig(object):
+#    @staticmethod
+#    def from_xml_elem(elem):
+#        c = ChimerascanConfig()
+#        for attrname in ("index", "trim5", "trim3", "frag_size_percentile"):
+#            setattr(c, attrname, elem.findtext(attrname))
+#        c.args = []
+#        for arg_elem in elem.findall("arg"):
+#            c.args.append(arg_elem.text)
+#        return c
+#    
+#    def to_xml(self, root):
+#        for attrname in ("index", "trim5", "trim3", "frag_size_percentile"):
+#            attrval = getattr(self,attrname)
+#            if attrval is not None:
+#                elem = etree.SubElement(root, attrname)
+#                elem.text = str(attrval)
+#        for arg in self.args:
+#            elem = etree.SubElement(root, "arg")
+#            elem.text = arg            
+#
+#    def is_valid(self, species_dir):
+#        valid = True
+#        species_sub = lambda arg: arg.replace("${SPECIES}", species_dir)
+#        newindex = species_sub(self.index)
+#        if not os.path.exists(newindex):
+#            logging.error("File not found: %s" % (newindex))
+#            valid = False
+#        return valid
 
 class BWAConfig(object):
+    __fields__ = ("bwa_cores", "nmismatch", "bwa_qual_trim", "mapping_qual")
+
     @staticmethod
     def from_xml_elem(elem):
         c = BWAConfig()
-        for attrname in ("bwa_cores", "nmismatch", "bwa_qual_trim", "mapping_qual"):
+        for attrname in BWAConfig.__fields__:
             setattr(c, attrname, elem.findtext(attrname))
         c.args = []
         for arg_elem in elem.findall("arg"):
@@ -698,24 +539,27 @@ class BWAConfig(object):
         return c
 
     def to_xml(self, root):
-        for attrname in ("bwa_cores", "nmismatch", "bwa_qual_trim", "mapping_qual"):
+        for attrname in BWAConfig.__fields__:
             attrval = getattr(self,attrname)
             if attrval is not None:
                 elem = etree.SubElement(root, attrname)
                 elem.text = str(attrval)
         for arg in self.args:
             elem = etree.SubElement(root, "arg")
-            elem.text = arg  
+            elem.text = arg
                       
-    # TODO: IS valid function
-    #def is_valid(self, species_dir):
+    def is_valid(self):
+        # TODO: write this function
+        return True
 
 
-class VarScanConfig(object):
+class VarscanConfig(object):
+    __fields__ = ("min_coverage", "min_reads_alt", "min_avgbase_quality", 
+                  "min_var_freq", "min_pvalue")
     @staticmethod
     def from_xml_elem(elem):
-        c = VarScanConfig()
-        for attrname in ("min_coverage", "min_reads_alt", "min_avgbase_quality", "min_var_freq","min_pvalue"):
+        c = VarscanConfig()
+        for attrname in VarscanConfig.__fields__:
             setattr(c, attrname, elem.findtext(attrname))
         c.args = []
         for arg_elem in elem.findall("arg"):
@@ -723,7 +567,7 @@ class VarScanConfig(object):
         return c
 
     def to_xml(self, root):
-        for attrname in ("min_coverage", "min_reads_alt", "min_avgbase_quality", "min_var_freq","min_pvalue"):
+        for attrname in VarscanConfig.__fields__:
             attrval = getattr(self,attrname)
             if attrval is not None:
                 elem = etree.SubElement(root, attrname)
@@ -731,9 +575,10 @@ class VarScanConfig(object):
         for arg in self.args:
             elem = etree.SubElement(root, "arg")
             elem.text = arg  
-                      
-    # TODO: IS valid function
-    #def is_valid(self, species_dir):
+
+    def is_valid(self):
+        # TODO: write this function
+        return True
 
         
 class PipelineConfig(object):
@@ -760,7 +605,7 @@ class PipelineConfig(object):
         c.ucsc_dir = ""
         c.picard_dir = ""
         c.varscan_dir = ""
-        c.bwa_bin="bwa"
+        c.bwa_bin = "bwa"
         # check environment
         if "PICARDPATH" in os.environ:
             c.picard_dir = os.environ["PICARDPATH"]
@@ -782,25 +627,23 @@ class PipelineConfig(object):
         elem = root.find("cufflinks")
         for arg_elem in elem.findall("arg"):
             c.cufflinks_args.append(arg_elem.text)
+        # TODO: chimerascan has now been deprecated, remove this
         # chimerascan parameters
-        c.chimerascan_config = ChimerascanConfig.from_xml_elem(root.find("chimerascan"))
+        # c.chimerascan_config = ChimerascanConfig.from_xml_elem(root.find("chimerascan"))
         # server setup
         c.servers = {}
         for elem in root.findall("server"):
             server = ServerConfig.from_xml_elem(elem)
             c.servers[server.name] = server
-        
         # bwa parameters 
         c.bwa_config = BWAConfig.from_xml_elem(root.find("bwa"))
         # varscan parameters
-        c.vscan_config = VarScanConfig.from_xml_elem(root.find("varscan"))
-        
+        c.vscan_config = VarscanConfig.from_xml_elem(root.find("varscan"))
         # genome config
         c.species = {}
         for elem in root.findall("species"):
             g = GenomeConfig.from_xml_elem(elem)
             c.species[g.species] = g
-        
         return c
 
     def to_xml(self, output_file):
@@ -828,16 +671,16 @@ class PipelineConfig(object):
         for arg in self.cufflinks_args:
             elem = etree.SubElement(cufflinks_elem, "arg")
             elem.text = arg
+        # TODO: chimerascan has now been deprecated, remove this
         # chimerascan parameters
-        chimerascan_elem = etree.SubElement(root, "chimerascan")
-        self.chimerascan_config.to_xml(chimerascan_elem)
+        #chimerascan_elem = etree.SubElement(root, "chimerascan")
+        #self.chimerascan_config.to_xml(chimerascan_elem)
         # bwa parameters
         bwa_elem = etree.SubElement(root, "bwa")
         self.bwa_config.to_xml(bwa_elem)
         # varscan parameters
         vscan_elem = etree.SubElement(root, "varscan")
         self.vscan_config.to_xml(vscan_elem)
-
         # servers
         for server in self.servers.itervalues():            
             elem = etree.SubElement(root, "server")
@@ -853,7 +696,7 @@ class PipelineConfig(object):
         print >>f, etree.tostring(root)
         f.close() 
 
-    def is_valid(self, server_name, species_name):
+    def is_valid(self, server_name):
         """
         ensure configuration is valid
         """
@@ -866,18 +709,24 @@ class PipelineConfig(object):
         if not server.is_valid():
             logging.error("Server %s missing required paths" % (server_name))
             valid = False
-        # check genome
-        if species_name not in self.species:
-            logging.error("Genome %s not found" % (species_name))
-            return False
-        genome = self.species[species_name]
-        if not genome.is_valid(server.references_dir):
-            logging.error("Genome %s missing required files" % (species_name))
-            valid = False
+        # check genomes
+        for species_name,genome in self.species.iteritems():
+            if not genome.is_valid(server.references_dir):
+                logging.error("Genome %s missing required files" % (species_name))
+                valid = False
+        # TODO: chimerascan has now been deprecated, remove this
         # check chimerascan config
-        species_dir = os.path.join(server.references_dir, genome.root_dir)
-        if not self.chimerascan_config.is_valid(species_dir):
-            logging.error("Chimerascan missing required files")
+        #species_dir = os.path.join(server.references_dir, genome.root_dir)
+        #if not self.chimerascan_config.is_valid(species_dir):
+        #    logging.error("Chimerascan missing required files")
+        #    valid = False
+        # check bwa config
+        if not self.bwa_config.is_valid():
+            logging.error("Invalid BWA configuration")
+            valid = False
+        # check varscan config
+        if not self.vscan_config.is_valid():
+            logging.error("Invalid Varscan configuration")
             valid = False
         #
         # Check software installation
@@ -994,20 +843,21 @@ class PipelineConfig(object):
         except ImportError, e:
             logging.error("Package 'pysam' not found")
             valid = False
+        # TODO: chimerascan deprecated so remove this
         # chimerascan binary
-        msg = 'chimerascan'
-        if check_executable("chimerascan_run.py"):
-            logging.debug("Checking for '%s' binary... found" % msg)
-        else:
-            logging.error("'%s' binary not found or not executable" % msg)
-            valid = False            
+        #msg = 'chimerascan'
+        #if check_executable("chimerascan_run.py"):
+        #    logging.debug("Checking for '%s' binary... found" % msg)
+        #else:
+        #    logging.error("'%s' binary not found or not executable" % msg)
+        #    valid = False            
         # check for chimerascan libraries
-        try:
-            import chimerascan
-            logging.debug("Checking for 'chimerascan' library... found")
-        except ImportError, e:
-            logging.error("Package 'chimerascan' not found")
-            valid = False
+        #try:
+        #    import chimerascan
+        #    logging.debug("Checking for 'chimerascan' library... found")
+        #except ImportError, e:
+        #    logging.error("Package 'chimerascan' not found")
+        #    valid = False
         # check bwa
         msg = 'BWA'
         if check_executable(self.bwa_bin):
@@ -1015,6 +865,5 @@ class PipelineConfig(object):
         else:
             logging.error("'%s' binary not found or not executable" % msg)
             valid = False
-    
-            
+        # TODO: check for varscan executable
         return valid

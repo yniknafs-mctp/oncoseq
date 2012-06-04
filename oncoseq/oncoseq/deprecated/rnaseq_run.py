@@ -12,7 +12,9 @@ import subprocess
 
 from oncoseq.lib import config
 from oncoseq.lib.config import AnalysisConfig, PipelineConfig
-from oncoseq.lib.cluster import scp, ssh_exec, qstat_user_job_count, remote_copy_file, test_file_exists
+from oncoseq.lib.cluster import qstat_user_job_count
+from oncoseq.lib.remote_server import scp, ssh_exec, test_file_exists, copy_to_remote, copy_from_remote
+from oncoseq.lib.seqdb import FRAGMENT_LAYOUT_PAIRED
 from oncoseq.lib import rundb
 
 import oncoseq
@@ -107,7 +109,11 @@ def run_remote(analysis_file, config_file, server_name, num_processors,
         ssh_exec(server.address, "mkdir -p %s" % (sample_path), server.ssh_port)
         for library in sample.libraries:
             for lane in library.lanes:
-                for readnum,attrname in enumerate(("read1_file", "read2_file")):
+                # handle single versus paired-end sequencing
+                seq_files = ("read1_file",)
+                if lane.fragment_layout == FRAGMENT_LAYOUT_PAIRED:
+                    seq_files = ("read1_file", "read2_file")                    
+                for readnum,attrname in enumerate(seq_files):
                     local_file = getattr(lane, attrname)
                     found = False
                     if server.seq_repo_mirror_dir is not None:
@@ -128,12 +134,13 @@ def run_remote(analysis_file, config_file, server_name, num_processors,
                         logging.info("Copying lane %s fastq file" % (lane.id))
                         ext = os.path.splitext(local_file)[-1]
                         remote_file = os.path.join(sample_path, "%s_%d%s" % (lane.id, readnum+1, ext))
-                        retcode = remote_copy_file(local_file, remote_file, 
-                                                   server.address, username, server.ssh_port, 
-                                                   maxsize=remote_copy_max_size_bytes, 
-                                                   tmp_dir=local_tmp_dir)
+                        retcode = copy_to_remote(local_file, remote_file, 
+                                                 server.address, username, 
+                                                 server.ssh_port, 
+                                                 maxsize=remote_copy_max_size_bytes, 
+                                                 tmp_dir=local_tmp_dir)
                         if retcode != 0:
-                            logging.error("Copy of read 1 failed")
+                            logging.error("Remote copy of %s (%s) failed" % (attrname, local_file))
                             # TODO: cleanup?
                             return config.JOB_ERROR
                         setattr(lane, attrname, remote_file)

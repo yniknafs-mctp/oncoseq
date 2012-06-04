@@ -34,6 +34,68 @@ def get_remote_file_size(remote_file, remote_address, username, port):
     file_size_bytes = int(res.strip().split()[0])
     return file_size_bytes
 
+# TODO: delete this -- redundant implementations (see below) 
+#def test_file_exists(remote_address, filename, port):
+#    # check that analysis is finished by noting presence of
+#    # job completion file
+#    command = 'if [ -f "%s" ]; then echo "1"; else echo "0"; fi' % (filename)
+#    args = map(str, ["ssh", "-p", port, remote_address, '%s' % (command)])
+#    logging.debug("\targs=%s" % (args))
+#    p = subprocess.Popen(args, stdout=subprocess.PIPE)
+#    res = p.communicate()[0]
+#    return bool(int(res.strip()))
+
+def test_file_exists(remote_file, remote_address, username, port):
+    command = 'test -s %s && echo 1' % (remote_file)
+    args = map(str, ["ssh", "-p", port, remote_address, '%s' % (command)])
+    logging.debug("\targs: %s" % (args))
+    p = subprocess.Popen(args, stdout=subprocess.PIPE)
+    res = p.communicate()[0]
+    exists = (res.strip() == "1")
+    return exists
+
+def remote_walk(remote_dir, remote_address, username, port):
+    command = 'find -P %s -printf "%%P,%%y,%%s\n"' % (remote_dir)
+    args = map(str, ["ssh", "-p", port, remote_address, '%s' % (command)])
+    logging.debug("\targs: %s" % (args))
+    p = subprocess.Popen(args, stdout=subprocess.PIPE)
+    res = p.communicate()[0]
+    fileinfo = []
+    for line in res.split("\n"):
+        fields = line.split(",")
+        if (not fields) or (len(fields) <= 1):
+            continue
+        filename, filetype, filesize = fields
+        fileinfo.append((filename, filetype, filesize))
+    p.wait()
+    return fileinfo
+
+def globus_copy_file(src, dst, remote_address, username, port):
+    #
+    # I don't know what path format src and dst are in,
+    # but they need to be full paths for this
+    #
+    # Since this isn't technically a remote address (goofy hashtag endpoint) I hardcoded it in
+    #
+    # As a placeholder until terry adds globus to exds, I put in my credentials on my box -
+    #  let me know if you want to test it
+    #
+    # the port is default (22 i think)
+    # 
+    #
+    logging.debug("Copying files")
+    user = "user"
+    host = "cli.globusonline.org"
+    tx_src  = "user#endpointname"
+    tx_dest = "umich#nyx"
+    
+    args = ["ssh",user + "@" + host,"scp",tx_src + ":" + src,tx_dest + ":" + src];
+    retcode = subprocess.call(args)        
+    if retcode != 0:
+        return JOB_ERROR  
+    
+    return 0
+
 def copy_to_remote(src, dst, remote_address, username, port, maxsize=(8<<30), tmp_dir="/tmp"):
     # maxsize should be bigger than 1mb
     maxsize = max(maxsize, (1<<20))
@@ -141,11 +203,13 @@ def copy_from_remote(src, dst, remote_address, username, port, maxsize=(8<<30), 
         return JOB_ERROR
     else:
         logging.debug("\tremote file size of %d bytes matches local file size" % (src_file_size))
-    return 0
+    return JOB_SUCCESS
 
 if __name__ == "__main__":
     logging.basicConfig(level=logging.DEBUG,
                         format="%(asctime)s - %(name)s - %(levelname)s - %(message)s")
-    copy_from_remote("/scratch/arul_flux/med-mctp/projects/rnaseq/runs/lung/lungC/job_2012-04-23-233056054968/lungA85/si_4387/varscan.snvs.txt", 
-                     "/home/mkiyer/bubba.txt", "flux-login.engin.umich.edu", "mkiyer", 22, maxsize=(1<<20),
-                     tmp_dir="/scratch/arul_flux/med-mctp/projects/rnaseq/tmp")
+    remote_walk('/scratch/arul_flux/med-mctp/projects/rnaseq/runs/job_2012-04-19-150419886085/wcmc_stid581_d', 
+                "flux-login.engin.umich.edu", "mkiyer", 22)
+    #copy_from_remote("/scratch/arul_flux/med-mctp/projects/rnaseq/runs/lung/lungC/job_2012-04-23-233056054968/lungA85/si_4387/varscan.snvs.txt", 
+    #                 "/home/mkiyer/bubba.txt", "flux-login.engin.umich.edu", "mkiyer", 22, maxsize=(1<<20),
+    #                 tmp_dir="/scratch/arul_flux/med-mctp/projects/rnaseq/tmp")

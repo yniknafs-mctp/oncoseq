@@ -7,6 +7,7 @@ import os
 import logging
 import xlrd
 import xml.etree.cElementTree as etree
+import collections
 
 # fragment layouts
 FRAGMENT_LAYOUT_SINGLE = "single"
@@ -16,13 +17,37 @@ FRAGMENT_LAYOUT_PAIRED = "paired"
 SANGER_FORMAT = "sanger"
 SOLEXA_FORMAT = "solexa"
 ILLUMINA_FORMAT = "illumina"
-FASTQ_QUAL_FORMATS = [SANGER_FORMAT, SOLEXA_FORMAT, ILLUMINA_FORMAT]
+FASTQ_QUAL_FORMATS = (SANGER_FORMAT, SOLEXA_FORMAT, ILLUMINA_FORMAT)
 
-# gender formats
-GENDER_MALE = "male"
-GENDER_FEMALE = "female"
-GENDER_NA = "na"
-GENDER_VALUES = [GENDER_MALE, GENDER_FEMALE]
+# source nucleotide types
+NUCLEOTIDE_RNA = "rna"
+NUCLEOTIDE_DNA = "dna"
+NUCLEOTIDE_TYPES = (NUCLEOTIDE_RNA, NUCLEOTIDE_DNA)
+
+# progression types
+PROGRESSION_BENIGN = "benign"
+PROGRESSION_CANCER = "cancer"
+PROGRESSION_METASTATIC = "metastatic"
+PROGRESSION_VALUES = (PROGRESSION_BENIGN, PROGRESSION_CANCER, PROGRESSION_METASTATIC)
+
+# strand protocol values
+STRAND_PROTOCOL_DUTP = "dutp"
+STRAND_PROTOCOL_UNSTRANDED = "unstranded"
+STRAND_PROTOCOL_VALUES = (STRAND_PROTOCOL_DUTP, STRAND_PROTOCOL_UNSTRANDED)
+
+# sample group types
+SAMPLE_TYPE_EXOME_TUMOR = "exome_tumor"
+SAMPLE_TYPE_EXOME_NORMAL = "exome_normal"
+SAMPLE_TYPE_RNASEQ = "rnaseq"
+SAMPLE_TYPE_CAPTURE_RNASEQ = "capture_rnaseq"
+SAMPLE_TYPES = (SAMPLE_TYPE_EXOME_TUMOR, SAMPLE_TYPE_EXOME_NORMAL,
+                SAMPLE_TYPE_RNASEQ, SAMPLE_TYPE_CAPTURE_RNASEQ)
+
+# analysis protocol values
+PROTOCOL_EXOME_DNA = "exome"
+PROTOCOL_POLYA_RNA = "rnaseq"
+PROTOCOL_EXOME_RNA = "capture_rnaseq"
+VALID_PROTOCOLS = (PROTOCOL_EXOME_DNA, PROTOCOL_POLYA_RNA, PROTOCOL_EXOME_RNA)
 
 class SeqDBError(Exception):
     pass
@@ -39,44 +64,88 @@ def _find_sequence_file(filename):
     return None
 
 class Patient(object):
-    __fields__ = ('id', 'description', 'species', 'ethnicity', 
-                  'gender', 'age') 
+    __fields__ = ('id', 'description', 'species', 'study')
 
     def __init__(self, **kwargs):
         for attrname in self.__fields__:
             if attrname in kwargs:
                 setattr(self, attrname, kwargs[attrname])        
+        # custom parameters
+        self.params = kwargs["params"]
         # relationships
         self.samples = []
+        self.sample_groups = {}
 
     @staticmethod
     def from_xml(elem):
         kwargs = {}
         for f in Patient.__fields__:
             kwargs[f] = elem.findtext(f)
-        return Patient(**kwargs)
-        
+        params = {}
+        for param_elem in elem.findall("param"):
+            params[param_elem.get("name")] = param_elem.text
+        kwargs["params"] = params
+        patient = Patient(**kwargs)
+        sample_dict = {}
+        # read samples
+        for sample_elem in elem.findall("sample"):
+            sample = Sample.from_xml(sample_elem)
+            sample_dict[sample.id] = sample
+            # link to patient
+            sample.patient = patient
+            patient.samples.append(sample)
+        # read sample groups
+        for grp_elem in elem.findall("sample_group"):
+            grp = SampleGroup.from_xml(grp_elem)
+            for sample_type in SAMPLE_TYPES:
+                v = getattr(grp, sample_type)
+                if not v:
+                    setattr(grp, sample_type, None)
+                    grp.samples[sample_type] = None
+                elif v not in sample_dict:
+                    logging.error("SampleGroup %s cannot link to %s sample %s" % (grp.id, sample_type, v))
+                    setattr(grp, sample_type, None)
+                    grp.samples[sample_type] = None
+                else:
+                    grp.samples[sample_type] = sample_dict[v]
+            grp.patient = patient
+            patient.sample_groups[grp.id] = grp
+        return patient
+
     def to_xml(self, root):
         parent = etree.SubElement(root, "patient")
         for f in Patient.__fields__:
             elem = etree.SubElement(parent, f)
             elem.text = getattr(self,f)
+        for k,v in self.params.iteritems():
+            elem = etree.SubElement(parent, "param", name=k)
+            elem.text = v
+        for grp in self.sample_groups.itervalues():
+            grp.to_xml(parent)
+        # recurse
+        for sample in self.samples:
+            sample.to_xml(parent)
         return parent
 
     def is_valid(self):
-        if self.gender not in GENDER_VALUES:
-            logging.error("Patient %s gender %s invalid" % (self.id, self.gender))
+        is_valid = True
+        for sample in self.samples:
+            is_valid = is_valid and sample.is_valid()
+        return is_valid
 
 
 class Sample(object):
     __fields__ = ("patient_id", "id", 'description',
-                  'sample_type', 'cohort', 'disease',
-                  'cancer_progression','protocol')
-        
+                  'sample_type', 'nucleotide_type',
+                  'cohort', 'disease',
+                  'cancer_progression')
+
     def __init__(self, **kwargs):
         for attrname in self.__fields__:
             if attrname in kwargs:
                 setattr(self, attrname, kwargs[attrname])        
+        # custom parameters
+        self.params = kwargs["params"]
         # relationships
         self.patient = None
         self.libraries = []
@@ -86,23 +155,80 @@ class Sample(object):
         kwargs = {}
         for f in Sample.__fields__:
             kwargs[f] = elem.findtext(f)
-        return Sample(**kwargs)
+        params = {}
+        for param_elem in elem.findall("param"):
+            params[param_elem.get("name")] = param_elem.text
+        kwargs["params"] = params
+        sample = Sample(**kwargs)
+        # read libraries
+        for lib_elem in elem.findall("library"):
+            lib = Library.from_xml(lib_elem)
+            lib.sample = sample
+            sample.libraries.append(lib)
+        return sample
         
     def to_xml(self, root):
         parent = etree.SubElement(root, "sample")
         for f in Sample.__fields__:
             elem = etree.SubElement(parent, f)
             elem.text = getattr(self,f)
+        for k,v in self.params.iteritems():
+            elem = etree.SubElement(parent, "param", name=k)
+            elem.text = v
+        # recurse
+        for library in self.libraries:
+            library.to_xml(parent)
         return parent
 
     def is_valid(self):
-        return True
-    
+        is_valid = True
+        if self.nucleotide_type not in NUCLEOTIDE_TYPES:
+            logging.error("Invalid nucleotide type %s" % (self.nucleotide_type))
+            is_valid = False
+        if self.cancer_progression not in PROGRESSION_VALUES:
+            logging.error("Invalid progression value %s" % (self.cancer_progression))
+            is_valid = False
+        if self.patient is None:
+            logging.error("Sample %s unknown patient" % (self.id))
+            is_valid = False            
+        for library in self.libraries:
+            is_valid = is_valid and library.is_valid()
+        return is_valid
 
+class SampleGroup(object):    
+    __fields__ = ('patient_id', 'id', 'exome_tumor', 'exome_normal',
+                  'rnaseq', 'capture_rnaseq')
+
+    def __init__(self, **kwargs):
+        for attrname in self.__fields__:
+            if attrname in kwargs:
+                setattr(self, attrname, kwargs[attrname])
+        # relationships
+        self.patient = None
+        self.samples = {}
+
+    @staticmethod
+    def from_xml(elem):
+        kwargs = {}
+        for f in SampleGroup.__fields__:
+            kwargs[f] = elem.findtext(f)
+        return SampleGroup(**kwargs)
+        
+    def to_xml(self, root):
+        parent = etree.SubElement(root, "sample_group")
+        for f in SampleGroup.__fields__:
+            elem = etree.SubElement(parent, f)
+            elem.text = getattr(self, f)
+        return parent
+
+    def is_valid(self):
+        valid = True
+        return valid
 
 class Library(object):
     __fields__ = ('sample_id', 'id', 'description',
-                  'strand_protocol', 'fragment_length','protocol')
+                  'strand_protocol', 'fragment_length', 
+                  'capture_kit', 'protocol')
         
     def __init__(self, **kwargs):
         for attrname in self.__fields__:
@@ -118,23 +244,47 @@ class Library(object):
         kwargs = {}
         for f in Library.__fields__:
             kwargs[f] = elem.findtext(f)
-        return Library(**kwargs)
+        lib = Library(**kwargs)
+        # read lanes
+        for lane_elem in elem.findall("lane"):
+            lane = Lane.from_xml(lane_elem)
+            lane.library = lib
+            lib.lanes.append(lane)
+        return lib
         
     def to_xml(self, root):
         parent = etree.SubElement(root, "library")
         for f in Library.__fields__:
             elem = etree.SubElement(parent, f)
             elem.text = getattr(self, f)
+        # recurse
+        for lane in self.lanes:
+            lane.to_xml(parent)
         return parent
 
     def is_valid(self):
-        return True
+        is_valid = True
+        if self.protocol not in VALID_PROTOCOLS:
+            logging.error("Invalid protocol value %s" % (self.protocol))
+            is_valid = False
+        # TODO: add capture kit check here
+        # check that RNA samples have valid strand protocol
+        if ((self.protocol != PROTOCOL_EXOME_DNA) and
+            self.strand_protocol not in STRAND_PROTOCOL_VALUES):
+            logging.error("Invalid strand protocol %s" % (self.strand_protocol))
+            is_valid = False
+        if self.sample is None:
+            logging.error("Library %s unknown sample" % (self.id))
+            is_valid = False            
+        for lane in self.lanes:
+            is_valid = is_valid and lane.is_valid()
+        return is_valid
 
 
 class Lane(object):    
     __fields__ = ('center_name', 'run', 'lane', 'library_id', 'id',
                   'platform', 'fragment_layout', 'quality_scores',
-                  'read1_file', 'read2_file', 'comments', 'qc','exome_kit')
+                  'read1_file', 'read2_file', 'comments', 'qc')
 
     def __init__(self, **kwargs):
         for attrname in self.__fields__:
@@ -177,8 +327,6 @@ class Lane(object):
             valid = False
         if self.library is None:
             logging.error("Lane %s unknown library" % (self.id))
-        if self.qc == "FAIL":
-            logging.error("Lane %s marked QC FAIL" % (self.id))
             valid = False
         return valid
 
@@ -187,7 +335,7 @@ def read_wksheet(wksheet):
     field_descs = wksheet.row_values(1)
     for rownum in xrange(2, wksheet.nrows):
         fields = wksheet.row_values(rownum)
-        #print fields
+        # print fields
         fields = [' '.join(str(field).split('\n')) for field in fields]
         # build dictionary of field names to field values
         field_name_value_dict = dict((field_names[i], fields[i]) for i in xrange(len(fields)))
@@ -207,23 +355,52 @@ class SeqDB(object):
         sheet_names = wkbook.sheet_names()
         if not "patients" in sheet_names:
             raise SeqDBError("XLS file missing 'patients' Sheet")
+        if not "patient_parameters" in sheet_names:
+            raise SeqDBError("XLS file missing 'patient_parameters' Sheet")
         if not "samples" in sheet_names:
             raise SeqDBError("XLS file missing 'samples' Sheet")
+        if not "sample_parameters" in sheet_names:
+            raise SeqDBError("XLS file missing 'sample_parameters' Sheet")
         if not "libraries" in sheet_names:
             raise SeqDBError("XLS file missing 'libraries' Sheet")
         if not "lanes" in sheet_names:
             raise SeqDBError("XLS file missing 'lanes' Sheet")
+        # read patient parameters
+        patient_params = collections.defaultdict(lambda: {})
+        for field_dict in read_wksheet(wkbook.sheet_by_name("patient_parameters")):
+            patient_id = field_dict["id"]
+            k = field_dict["parameter_name"]
+            v = field_dict["parameter_value"]
+            patient_params[patient_id][k] = v
         # read patients
         patients = {}
         for field_dict in read_wksheet(wkbook.sheet_by_name("patients")):
+            # add params to field dict
+            field_dict["params"] = patient_params[field_dict["id"]]
+            # build patient object
             p = Patient(**field_dict)
-            print p.id
+            # ensure unique ids
+            if p.id in patients:
+                raise SeqDBError("Found duplicate patient id %s" % (p.id))
             patients[p.id] = p
+        # read sample parameters
+        sample_params = collections.defaultdict(lambda: {})
+        for field_dict in read_wksheet(wkbook.sheet_by_name("sample_parameters")):
+            sample_id = field_dict["id"]
+            k = field_dict["parameter_name"]
+            v = field_dict["parameter_value"]
+            sample_params[sample_id][k] = v
         # read samples
         samples = {}
         for field_dict in read_wksheet(wkbook.sheet_by_name("samples")):
-            #print field_dict
+            # add params to field dict
+            field_dict["params"] = sample_params[field_dict["id"]]
+            # build sample object
             s = Sample(**field_dict)
+            # ensure unique ids
+            if s.id in samples:
+                raise SeqDBError("Found duplicate sample id %s" % (s.id))
+            # link samples to patients
             p = patients[s.patient_id]
             p.samples.append(s)
             s.patient = p
@@ -246,10 +423,30 @@ class SeqDB(object):
             if not lane.is_valid():
                 logging.error("Lane %s skipped" % (lane.id))
             lanes[lane.id] = lane
+        # read sample groups
+        sample_groups = {}
+        for field_dict in read_wksheet(wkbook.sheet_by_name("groups")):
+            grp = SampleGroup(**field_dict)
+            p = patients[grp.patient_id]
+            p.sample_groups[grp.id] = grp
+            grp.patient = p
+            for sample_type in SAMPLE_TYPES:
+                v = getattr(grp, sample_type)
+                if not v:
+                    setattr(grp, sample_type, None)
+                    grp.samples[sample_type] = None
+                elif v not in samples:
+                    logging.error("Cannot link to sample %s in SampleGroup %s" % (v, grp.id))
+                    setattr(grp, sample_type, None)
+                    grp.samples[sample_type] = None
+                else:
+                    grp.samples[sample_type] = samples[v]
+            sample_groups[grp.id] = grp
         # make seqdb object
         seqdb = SeqDB()
         seqdb.patients = patients
-        seqdb.samples = samples
+        seqdb.sample_groups = sample_groups
+        seqdb.samples = samples        
         seqdb.libraries = libraries
         seqdb.lanes = lanes
         return seqdb

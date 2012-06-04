@@ -1,0 +1,142 @@
+<oncoseq>
+  <!-- server setup -->
+  <server name="flux" address="flux-login.engin.umich.edu" ssh_port="22">
+    <modules_init_script>/scratch/arul_flux/med-mctp/sw/rhel5/init.sh</modules_init_script>
+    <output_dir>/scratch/arul_flux/med-mctp/projects/rnaseq/runs</output_dir>
+    <tmp_dir>/scratch/arul_flux/med-mctp/projects/rnaseq/tmp</tmp_dir>
+    <references_dir>/scratch/arul_flux/med-mctp/projects/rnaseq/references</references_dir>
+    <seq_repo_mirror_dir>/scratch/arul_flux/med-mctp/seq</seq_repo_mirror_dir>
+    <node_mem>45000</node_mem>
+    <node_processors>12</node_processors>
+    <pbs>yes</pbs>
+    <max_user_jobs>3000</max_user_jobs>
+    <script_line>#PBS -l qos=arul_flux</script_line>
+    <script_line>#PBS -A arul_flux</script_line>
+    <script_line>#PBS -q flux</script_line>
+    <script_line>#PBS -V</script_line>
+    <script_line>#PBS -M mkiyer@med.umich.edu</script_line>
+  </server>
+  <server name="mkiyer_rhel6" address="None" ssh_port="22">
+    <modules_init_script>/home/mkiyer/sw/rhel6/init.sh</modules_init_script>
+    <output_dir>/home/mkiyer/projects/oncoseq/runs</output_dir>
+    <tmp_dir>/home/mkiyer/projects/oncoseq/tmp</tmp_dir>
+    <references_dir>/exds/projects/rnaseq/references</references_dir>
+    <node_mem>256000</node_mem>
+    <node_processors>4</node_processors>
+    <pbs>no</pbs>
+  </server>
+  <server name="exds_lx4_pbs" address="None" ssh_port="22">
+    <modules_init_script>/exds/sw/rhel5/init.sh</modules_init_script>
+    <output_dir>/exds/projects/rnaseq/runs/mioncoseq</output_dir>
+    <tmp_dir>/exds/projects/rnaseq/tmp</tmp_dir>
+    <references_dir>/exds/projects/rnaseq/references</references_dir>
+    <node_mem>100000</node_mem>
+    <node_processors>48</node_processors>
+    <pbs>yes</pbs>
+    <max_user_jobs>1000</max_user_jobs>
+    <script_line>#PBS -V</script_line>
+    <script_line>#PBS -M mkiyer@med.umich.edu</script_line>
+  </server>
+  <server name="exds_pb5" address="None" ssh_port="22">
+    <modules_init_script>/exds/sw/rhel5/init.sh</modules_init_script>
+    <output_dir>/exds/projects/rnaseq/runs/test</output_dir>
+    <tmp_dir>/exds/projects/rnaseq/tmp</tmp_dir>
+    <references_dir>/exds/projects/rnaseq/references</references_dir>
+    <node_mem>100000</node_mem>
+    <node_processors>16</node_processors>
+    <pbs>no</pbs>
+  </server>
+  <server name="exds_rhel5" address="None" ssh_port="22">
+    <modules_init_script>/exds/sw/rhel5/init.sh</modules_init_script>
+    <output_dir>/exds/projects/rnaseq/runs/test</output_dir>
+    <tmp_dir>/exds/projects/rnaseq/tmp</tmp_dir>
+    <references_dir>/exds/projects/rnaseq/references</references_dir>
+    <node_mem>256000</node_mem>
+    <node_processors>48</node_processors>
+    <pbs>no</pbs>
+  </server>
+
+  <!-- modules used by pipeline -->
+  <modules>
+    <module>epd</module>
+    <module>java</module>
+    <module>R</module>
+    <module>activeperl</module>
+    <module>bioinfo</module>
+    <module>bx-python/0.7.0</module>
+    <module>pysam/0.5</module>
+    <module>fastqc/0.9.4</module>
+    <module>picard/1.50</module>
+    <module>samtools/0.1.18</module>
+    <module>bowtie/0.12.7</module>
+    <module>bowtie2/2.0.0-beta6</module>
+    <module>tophat/2.0.2</module>
+    <module>cufflinks/2.0.0</module>
+    <module>BEDTools/2.12.0</module>
+    <module>ucsc/2012-Feb-08</module>
+    <module>varscan/2.2.8</module>
+    <module>bwa/0.6.1</module>
+  </modules>
+
+  <!-- RNA pipeline -->
+  <!-- fragment size parameters -->
+  <fragment_size_mean_default>200</fragment_size_mean_default>
+  <fragment_size_stdev_default>80</fragment_size_stdev_default>
+  <adaptor_length_default>110</adaptor_length_default>
+  <min_fragment_size>0</min_fragment_size>
+  <max_fragment_size>1000</max_fragment_size>
+
+  <!-- tophat parameters -->
+  <tophat>
+    <arg>--GTF ${SPECIES}/Annotation/Genes/genes.gtf</arg>
+    <arg>--transcriptome-index ${SPECIES}/Sequence/TranscriptomeTophat2Index/known</arg>   
+  </tophat>
+
+  <!-- cufflinks parameters -->
+  <cufflinks>
+    <arg>--GTF ${SPECIES}/Annotation/Genes/genes.gtf</arg>
+    <arg>-M ${SPECIES}/Annotation/Genes/cufflinks_mask_genes.gtf</arg>
+    <arg>-b ${SPECIES}/Sequence/GenomeBowtie2Index/genome.fa</arg>
+    <arg>--multi-read-correct</arg>
+    <arg>--no-update-check</arg>
+    <arg>-q</arg>
+  </cufflinks>
+
+  <!--Exome Pipeline Parameters -->
+  <!--BWA Parameters -->
+  <bwa>
+    <bwa_cores>6</bwa_cores>
+    <nmismatch>2</nmismatch>
+    <bwa_qual_trim>20</bwa_qual_trim>
+    <mapping_qual>10</mapping_qual>
+  </bwa>
+
+  <!--Varscan Parameters -->
+  <varscan>
+    <min_coverage>1</min_coverage>
+    <min_reads_alt>1</min_reads_alt>
+    <min_avgbase_quality>13</min_avgbase_quality>
+    <min_var_freq>0.01</min_var_freq>
+    <min_pvalue>0.01</min_pvalue>
+  </varscan>
+  
+  <!-- species specific file locations -->
+  <species name="human">
+    <root_dir>Homo_sapiens/Ensembl/GRCh37</root_dir>
+    <abundant_bowtie_index>Sequence/AbundantSequences/abundant</abundant_bowtie_index>
+    <xeno_bowtie_index>Sequence/ForeignContaminantSequences/contaminants</xeno_bowtie_index>
+    <genome_fasta_file>Sequence/BowtieIndex/genome.fa</genome_fasta_file>
+    <genome_bwa_index>Sequence/BWAIndex/BWA.0.6.1/genome.fa</genome_bwa_index>
+    <genome_bowtie_index>Sequence/BowtieIndex/genome</genome_bowtie_index>
+    <genome_bowtie2_index>Sequence/GenomeBowtie2Index/genome</genome_bowtie2_index>
+    <fragment_size_bowtie_index>Sequence/FragSizeBowtieIndex/fragsize</fragment_size_bowtie_index>
+    <gene_annotation_refflat>Annotation/Genes/refFlat.txt</gene_annotation_refflat>
+    <picard_ribosomal_intervals>Annotation/Genes/picard_ribosomal_intervals.txt</picard_ribosomal_intervals>
+    <chrom_sizes>Annotation/Genes/ChromInfo.txt</chrom_sizes>
+    <cosmic_positions>Sequence/ExomeDefinition/CosmicMutations_AtInformativeGenes_cosmic_v56_151111.3.bed</cosmic_positions>
+    <capture_roche>Sequence/ExomeDefinition/Roche_probes_coords_EZExome2_Tiled.bed</capture_roche>
+    <capture_agilent>Sequence/ExomeDefinition/SureSelect_probes_coords_50MbKit.bed</capture_agilent>
+    <exome_bed_file>Sequence/ExomeDefinition/CCDSGene.B37.bed</exome_bed_file>
+  </species>
+
+</oncoseq>

@@ -9,6 +9,8 @@ import os
 import sys
 
 from oncoseq.lib import config
+from oncoseq.lib import fastqc
+from oncoseq.lib.base import file_exists_and_nz_size
 from oncoseq.lib.seq import get_qual_conversion_func, FASTQ_QUAL_FORMATS, open_compressed
 
 def parse_lines(line_iter, numlines=1):
@@ -21,11 +23,34 @@ def parse_lines(line_iter, numlines=1):
     except StopIteration:
         pass
 
-def copy_uncompress_sequence(src, dst, quals):
+def copy_uncompress_sequence(src, dst, quals, fastqc_data_files):
     """
     uncompresses reads, renames reads, and converts quality scores 
     to 'sanger' format
     """
+    # get fastq format from fastqc output
+    encodings = set()
+    for f in fastqc_data_files:
+        if file_exists_and_nz_size(f):
+            encoding = fastqc.get_fastq_encoding(f)
+            if encoding not in fastqc.ENCODING_TO_QUAL_FORMAT:
+                logging.error("Unrecognized FASTQ encoding %s" % (encoding))
+                return config.JOB_ERROR
+            encodings.add(fastqc.ENCODING_TO_QUAL_FORMAT[encoding])
+    if len(encodings) > 1:
+        logging.error("Detected different FASTQ encodings in paired-end files")
+        return config.JOB_ERROR
+    elif len(encodings) == 0:
+        logging.warning("Could not locate FASTQC data to determine encoding, using value %s found in XML" % (quals))
+        encodings.add(quals)
+    # reconcile disagreement in quality scores
+    auto_quals = encodings.pop()
+    if quals != auto_quals:
+        logging.warning("Auto-detected FASTQ format %s differs from XML file (%s)"
+                        % (auto_quals, quals))
+        quals = auto_quals
+    logging.info("Copying and converting FASTQ files with quality scores "
+                 "in %s format" % (quals))
     # setup file iterators
     fh = open_compressed(src)
     fqiter = parse_lines(fh, numlines=4)
@@ -59,10 +84,15 @@ def main():
                         format="%(asctime)s - %(name)s - %(levelname)s - %(message)s")
     parser = argparse.ArgumentParser()
     parser.add_argument("--quals", choices=FASTQ_QUAL_FORMATS)
+    parser.add_argument("--fastqc-data-files", dest="fastqc_data_files", default=None)
     parser.add_argument("src")
     parser.add_argument("dst")
     args = parser.parse_args()
-    return copy_uncompress_sequence(args.src, args.dst, args.quals)
-    
+    if args.fastqc_data_files is None:
+        fastqc_data_files = []
+    else:
+        fastqc_data_files = args.fastqc_data_files.split(",")
+    return copy_uncompress_sequence(args.src, args.dst, args.quals, fastqc_data_files)
+
 if __name__ == '__main__': 
     sys.exit(main())

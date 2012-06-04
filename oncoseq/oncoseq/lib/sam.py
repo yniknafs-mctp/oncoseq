@@ -3,6 +3,21 @@ Created on Aug 10, 2011
 
 @author: mkiyer
 '''
+from base import file_exists_and_nz_size
+
+def check_sam_file(filename, isbam=False):
+    is_valid = True
+    if not file_exists_and_nz_size(filename):
+        is_valid = False
+    else:
+        import pysam
+        try:
+            fmt = "rb" if isbam else "r"
+            samfh = pysam.Samfile(filename, fmt)
+            samfh.close()   
+        except:
+            is_valid = False
+    return is_valid
 
 def parse_reads_by_qname(samfh):
     """
