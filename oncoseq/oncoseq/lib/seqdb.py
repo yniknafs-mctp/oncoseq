@@ -259,6 +259,10 @@ class Library(object):
             elem.text = getattr(self, f)
         # recurse
         for lane in self.lanes:
+            # TODO: check to make sure this is the best way to exclude 
+            # QC fail libraries
+            if lane.qc == "FAIL":
+                continue
             lane.to_xml(parent)
         return parent
 
