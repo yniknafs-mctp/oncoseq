@@ -17,6 +17,7 @@ import oncoseq.exome.pipeline
 _oncoseq_pipeline_dir = oncoseq.pipeline.__path__[0]
 _exome_pipeline_dir = oncoseq.exome.pipeline.__path__[0] 
 
+num_processes=3
 #TODO: Adjust pmem= int(round(float(server.node_mem)/2, 0)), according to the input file size.
 # This way I am asking 22 GB of memory which could be overkilling.
 def run_lane(lane, genome, server, pipeline, num_processors,
@@ -158,13 +159,13 @@ def run_lane(lane, genome, server, pipeline, num_processors,
         log_file = os.path.join(log_dir, "bwa_mapping_%s.log" % (lane.id))
         logging.debug("\targs: %s" % (' '.join(map(str, args))))
         job_id = submit_job_func("bwaM_%s" % (lane.id), args,
-                                 num_processors=1,
+                                 num_processors=server.node_processors/num_processes,
                                  node_processors=server.node_processors,
                                  node_memory=server.node_mem,
-                                 pmem= int(round(float(server.node_mem)/2, 0)),
+                                 mem= int(round(float(server.node_mem)/num_processes, 0)),
                                  pbs_script_lines=server.pbs_script_lines,
                                  working_dir=lane.output_dir,
-                                 walltime="60:00:00",
+                                 walltime='36:00:00',#"60:00:00",
                                  deps=aln_job_ids,
                                  stderr_filename=log_file)
         bwa_dep.extend([job_id])
@@ -191,10 +192,10 @@ def run_lane(lane, genome, server, pipeline, num_processors,
         logging.debug("\targs: %s" % (' '.join(map(str, args))))
         
         job_id = submit_job_func("sam2bam_%s" % (lane.id), args,
-                                 num_processors=1,
+                                 num_processors=server.node_processors/num_processes, #1
                                  node_processors=server.node_processors,
                                  node_memory=server.node_mem,
-                                 pmem= int(round(float(server.node_mem)/2, 0)),
+                                 mem= int(round(float(server.node_mem)/num_processes, 0)),
                                  pbs_script_lines=server.pbs_script_lines,
                                  working_dir=lane.output_dir,
                                  walltime="24:00:00",
@@ -229,10 +230,10 @@ def run_lane(lane, genome, server, pipeline, num_processors,
         log_file = os.path.join(log_dir, "sort_aligned_reads.log")
         logging.debug("\targs: %s" % (' '.join(map(str, args))))
         job_id = submit_job_func("sortexom_%s" % (lane.id), args,
-                                 num_processors=1,
+                                 num_processors=server.node_processors/num_processes,#1
                                  node_processors=server.node_processors,
                                  node_memory=server.node_mem,
-                                 pmem= int(round(float(server.node_mem)/2, 0)),
+                                 mem= int(round(float(server.node_mem)/num_processes, 0)),#pmem
                                  pbs_script_lines=server.pbs_script_lines,
                                  working_dir=lane.output_dir,
                                  walltime="12:00:00",
@@ -328,10 +329,10 @@ def run_library(library, genome, server, pipeline, num_processors,
             log_file = os.path.join(log_dir, "picard_merge_bam_files.log")
             logging.debug("\targs: %s" % (' '.join(map(str, args))))
             job_id = submit_job_func("merge_%s" % (library.id), args,
-                                     num_processors=min(1, num_processors),
+                                     num_processors=min(server.node_processors/num_processes, num_processors), #1 
                                      node_processors=server.node_processors,
                                      node_memory=server.node_mem,
-                                     pmem=int(round(float(server.node_mem)/2, 0)),
+                                     mem=int(round(float(server.node_mem)/num_processes, 0)),#pmem
                                      pbs_script_lines=server.pbs_script_lines,
                                      working_dir=library.output_dir,
                                      walltime="24:00:00",
@@ -380,13 +381,13 @@ def run_library(library, genome, server, pipeline, num_processors,
         log_file = os.path.join(log_dir, "bam_cleaning.log")
         logging.debug("\targs: %s" % (' '.join(map(str, args))))
         job_id = submit_job_func("bamcln_%s" % (library.id), args,
-                                 num_processors=1,
+                                 num_processors=server.node_processors/num_processes, #1
                                  node_processors=server.node_processors,
                                  node_memory=server.node_mem,
-                                 pmem=int(round(float(server.node_mem)/2, 0)),
+                                 mem=int(round(float(server.node_mem)/num_processes, 0)),#pmem
                                  pbs_script_lines=server.pbs_script_lines,
                                  working_dir=library.output_dir,
-                                 walltime="60:00:00",
+                                 walltime="36:00:00",
                                  deps=merge_bam_deps,
                                  stderr_filename=log_file)
         cleaning_dep = [job_id]
@@ -455,10 +456,10 @@ def run_sample(sample, genome, server, pipeline, num_processors,
             log_file = os.path.join(log_dir, "picard_merge_bam_files.log")
             logging.debug("\targs: %s" % (' '.join(map(str, args))))
             job_id = submit_job_func("merge_%s" % (library.id), args,
-                                     num_processors=min(1, num_processors),
+                                     num_processors=min(server.node_processors/num_processes, num_processors), #1
                                      node_processors=server.node_processors,
                                      node_memory=server.node_mem,
-                                     pmem=int(round(float(server.node_mem)/2, 0)),
+                                     mem=int(round(float(server.node_mem)/num_processors, 0)),#pmem
                                      pbs_script_lines=server.pbs_script_lines,
                                      working_dir=library.output_dir,
                                      walltime="24:00:00",
@@ -483,13 +484,13 @@ def run_sample(sample, genome, server, pipeline, num_processors,
                 log_file = os.path.join(log_dir, "bam_cleaning.log")
                 logging.debug("\targs: %s" % (' '.join(map(str, args))))
                 job_id = submit_job_func("bamcln_%s" % (library.id), args,
-                                         num_processors=1,
+                                         num_processors=server.node_processors/num_processes, #1
                                          node_processors=server.node_processors,
                                          node_memory=server.node_mem,
-                                         pmem=int(round(float(server.node_mem)/2, 0)),
+                                         mem=int(round(float(server.node_mem)/num_processes, 0)), #pmem
                                          pbs_script_lines=server.pbs_script_lines,
                                          working_dir=library.output_dir,
-                                         walltime="60:00:00",
+                                         walltime="36:00:00",
                                          deps=merge_bam_deps,
                                          stderr_filename=log_file)
                 cleaning_dep = [job_id]
@@ -602,9 +603,10 @@ def run_sample(sample, genome, server, pipeline, num_processors,
         log_file = os.path.join(log_dir, "capture_coverage.log")
         logging.debug("\targs: %s" % (' '.join(map(str, args))))
         job_id = submit_job_func("probe_cov_%s" % (sample.id), args,
-                                 num_processors=1,
+                                 num_processors=server.node_processors/num_processes, #1
                                  node_processors=server.node_processors,
                                  node_memory=server.node_mem,
+                                 mem=int(round(float(server.node_mem)/num_processes, 0)),
                                  pbs_script_lines=server.pbs_script_lines,
                                  working_dir=sample.output_dir,
                                  walltime="24:00:00",
@@ -707,10 +709,10 @@ def run_sample_group(grp, genome, server, pipeline, num_processors,
         log_stderr_file = os.path.join(log_dir, "samtools_snp_calling_stderr.log")
         logging.debug("\targs: %s" % (' '.join(map(str, args))))
         job_id = submit_job_func("samsnv_%s" % (grp.id), args,
-                                 num_processors=1,
+                                 num_processors=server.node_processors/num_processes, #1
                                  node_processors=server.node_processors,
                                  node_memory=server.node_mem,
-                                 pmem= int(round(float(server.node_mem)/2, 0)),
+                                 mem=int(round(float(server.node_mem)/num_processes, 0)),#pmem
                                  pbs_script_lines=server.pbs_script_lines,
                                  working_dir=grp.output_dir,
                                  walltime="60:00:00",
@@ -738,10 +740,10 @@ def run_sample_group(grp, genome, server, pipeline, num_processors,
         log_stderr_file = os.path.join(log_dir, "varscan_snp_calling_stderr.log")
         logging.debug("\targs: %s" % (' '.join(map(str, args))))
         job_id = submit_job_func("varscan_%s" % (grp.id), args,
-                                 num_processors=1,
+                                 num_processors=server.node_processors/num_processes,#1
                                  node_processors=server.node_processors,
                                  node_memory=server.node_mem,
-                                 pmem= int(round(float(server.node_mem)/2, 0)),
+                                 mem= int(round(float(server.node_mem)/num_processes, 0)),#2 pmem
                                  pbs_script_lines=server.pbs_script_lines,
                                  working_dir=grp.output_dir,
                                  walltime="60:00:00",
