@@ -70,7 +70,7 @@
     <module>samtools/0.1.18</module>
     <module>bowtie/0.12.7</module>
     <module>bowtie2/2.0.0-beta6</module>
-    <module>tophat/2.0.2</module>
+    <module>tophat/2.0.3</module>
     <module>cufflinks/2.0.0</module>
     <module>BEDTools/2.12.0</module>
     <module>ucsc/2012-Feb-08</module>
