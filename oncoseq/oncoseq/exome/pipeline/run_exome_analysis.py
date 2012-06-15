@@ -18,8 +18,6 @@ _oncoseq_pipeline_dir = oncoseq.pipeline.__path__[0]
 _exome_pipeline_dir = oncoseq.exome.pipeline.__path__[0] 
 
 num_processes=3
-#TODO: Adjust pmem= int(round(float(server.node_mem)/2, 0)), according to the input file size.
-# This way I am asking 22 GB of memory which could be overkilling.
 def run_lane(lane, genome, server, pipeline, num_processors,
              submit_job_func):
     #
