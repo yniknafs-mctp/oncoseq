@@ -325,14 +325,14 @@ def run_lane(lane, genome, server, pipeline, num_processors,
         args.extend(lane.filtered_fastq_files)
         logging.debug("\targs: %s" % (' '.join(map(str, args))))
         log_file = os.path.join(log_dir, "tophat.log")
-        # allocate 10gb to run tophat
+        # allocate 16gb to run tophat
         job_id = submit_job_func("tophat_%s" % (lane.id), args,
                                  num_processors=num_processors,
                                  node_processors=server.node_processors,
                                  node_memory=server.node_mem,
                                  pbs_script_lines=server.pbs_script_lines,
                                  working_dir=lane.output_dir,
-                                 mem=10000,
+                                 mem=16000,
                                  walltime="80:00:00",
                                  deps=frag_size_deps,
                                  stderr_filename=log_file)
