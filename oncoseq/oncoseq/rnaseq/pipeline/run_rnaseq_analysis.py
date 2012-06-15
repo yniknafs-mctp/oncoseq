@@ -17,6 +17,7 @@ import oncoseq.pipeline
 import oncoseq.rnaseq.pipeline
 _oncoseq_pipeline_dir = oncoseq.pipeline.__path__[0]
 _rnaseq_pipeline_dir = oncoseq.rnaseq.pipeline.__path__[0] 
+num_processes=3 # tmp move to the config file.
 
 def run_lane(lane, genome, server, pipeline, num_processors,
              submit_job_func):
@@ -618,10 +619,10 @@ def run_library(library, genome, server, pipeline, num_processors,
         log_stderr_file = os.path.join(log_dir, "varscan_snp_calling_stderr.log")
         logging.debug("\targs: %s" % (' '.join(map(str, args))))
         job_id = submit_job_func("varscan_%s" % (library.id), args,
-                                 num_processors=1,
+                                 num_processors=server.node_processors/num_processes,#1,
                                  node_processors=server.node_processors,
                                  node_memory=server.node_mem,
-                                 pmem= int(round(float(server.node_mem)/2, 0)),
+                                 mmem= int(round(float(server.node_mem)/num_processes, 0)), #int(round(float(server.node_mem)/2, 0)),
                                  pbs_script_lines=server.pbs_script_lines,
                                  working_dir=library.output_dir,
                                  walltime="60:00:00",
