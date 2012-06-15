@@ -334,7 +334,7 @@ def run_lane(lane, genome, server, pipeline, num_processors,
                                  pbs_script_lines=server.pbs_script_lines,
                                  working_dir=lane.output_dir,
                                  mem=16000,
-                                 walltime="80:00:00",
+                                 walltime="72:00:00",
                                  deps=frag_size_deps,
                                  stderr_filename=log_file)
         tophat_deps = [job_id]
@@ -630,7 +630,6 @@ def run_library(library, genome, server, pipeline, num_processors,
                                  stdout_filename=log_stdout_file,
                                  stderr_filename=log_stderr_file)
         varscan_deps = [job_id]
-        
     #
     # run cufflinks to estimate transcript abundance of known genes
     #
