@@ -34,16 +34,37 @@ def run_sample_group(grp, genome, server, pipeline,
     print >>f, etree.tostring(root)
     f.close()   
     # process rnaseq/exome samples
-    deps = []
-    deps.extend(run_rnaseq_analysis.run_sample_group(grp, genome, server, 
-                                                     pipeline, 
-                                                     num_processors, 
-                                                     submit_job_func, 
-                                                     keep_tmp))
-    deps.extend(run_exome_analysis.run_sample_group(grp, genome, server, 
-                                                    pipeline, num_processors, 
-                                                    submit_job_func, 
-                                                    keep_tmp))
+    grp_deps = []
+    grp_deps.extend(run_rnaseq_analysis.run_sample_group(grp, genome, server, 
+                                                         pipeline, 
+                                                         num_processors, 
+                                                         submit_job_func, 
+                                                         keep_tmp))
+    grp_deps.extend(run_exome_analysis.run_sample_group(grp, genome, server, 
+                                                        pipeline, num_processors, 
+                                                        submit_job_func, 
+                                                        keep_tmp))
+    #
+    # write file indicating job is complete
+    #
+    deps = grp_deps
+    msg = "Notifying user that job is complete"
+    if os.path.exists(grp.job_complete_file) and (len(grp_deps) == 0):
+        logging.info("[SKIPPED]: %s" % msg)
+    else:
+        logging.info(msg)
+        args = [sys.executable, os.path.join(_pipeline_dir, "notify_complete.py"),
+                grp.job_complete_file]
+        job_id = submit_job_func("grpdone_%s" % (grp.id), args,
+                                 num_processors=1,
+                                 node_processors=server.node_processors,
+                                 node_memory=server.node_mem,
+                                 pbs_script_lines=server.pbs_script_lines,
+                                 working_dir=grp.output_dir,
+                                 walltime="1:00:00",
+                                 email="ae",
+                                 deps=grp_deps)
+        deps = [job_id]
     return deps
 
 
@@ -80,7 +101,7 @@ def run_patient(patient, server, pipeline, num_processors,
     # write file indicating patient job is complete
     #
     msg = "Notifying user that patient job is complete"
-    deps = []
+    deps = grp_deps
     if os.path.exists(patient.job_complete_file) and (len(grp_deps) == 0):
         logging.info("[SKIPPED]: %s" % msg)
     else:

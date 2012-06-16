@@ -60,10 +60,14 @@ def submit_job_pbs(job_name,
     resource_fields = ["nodes=%d:ppn=%d" % (1, num_processors)]    
     # setup memory resources
     if mem is not None:
+        if mem > node_memory:
+            logging.warning("Job requested more memory than node supports (%dmb > %dmb)" % (mem, node_memory))        
         mem = min(mem, node_memory)
         resource_fields.append("mem=%dmb" % (mem))
     elif pmem is not None:
         max_pmem = float(node_memory) / num_processors
+        if pmem > max_pmem:
+            logging.warning("Job requested more memory-per-process (pmem) than node supports (%dmb > %dmb)" % (pmem, max_pmem))
         pmem = min(pmem, max_pmem)
         resource_fields.append("pmem=%dmb" % (pmem))
     else:
@@ -98,6 +102,7 @@ def submit_job_pbs(job_name,
     p = subprocess.Popen("qsub", stdin=subprocess.PIPE, stdout=subprocess.PIPE)
     p.stdin.write('\n'.join(lines))
     job_id = p.communicate()[0]
+    # TODO: parse output and check for errors
     return job_id.strip()
 
 def submit_job_nopbs(job_name, 

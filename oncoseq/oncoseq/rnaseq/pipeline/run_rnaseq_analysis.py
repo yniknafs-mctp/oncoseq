@@ -16,7 +16,7 @@ from oncoseq.lib.seqdb import SAMPLE_TYPE_RNASEQ, SAMPLE_TYPE_CAPTURE_RNASEQ
 import oncoseq.pipeline
 import oncoseq.rnaseq.pipeline
 _oncoseq_pipeline_dir = oncoseq.pipeline.__path__[0]
-_rnaseq_pipeline_dir = oncoseq.rnaseq.pipeline.__path__[0] 
+_rnaseq_pipeline_dir = oncoseq.rnaseq.pipeline.__path__[0]
 num_processes=3 # tmp move to the config file.
 
 def run_lane(lane, genome, server, pipeline, num_processors,
@@ -63,7 +63,8 @@ def run_lane(lane, genome, server, pipeline, num_processors,
                                  node_memory=server.node_mem,
                                  pbs_script_lines=server.pbs_script_lines,
                                  working_dir=lane.output_dir,
-                                 walltime="10:00:00",
+                                 mem=config.FASTQC_JOB_MEM,
+                                 walltime=config.FASTQC_JOB_WALLTIME,
                                  stderr_filename=log_file)
         fastqc_deps.append(job_id)
     #
@@ -89,7 +90,8 @@ def run_lane(lane, genome, server, pipeline, num_processors,
                                      node_memory=server.node_mem,
                                      pbs_script_lines=server.pbs_script_lines,
                                      working_dir=lane.output_dir,
-                                     walltime="20:00:00",
+                                     mem=config.COPY_UNCOMPRESS_JOB_MEM,
+                                     walltime=config.COPY_UNCOMPRESS_JOB_WALLTIME,
                                      deps=fastqc_deps,
                                      stderr_filename=log_file)
             copy_fastq_deps.append(job_id)
@@ -117,7 +119,8 @@ def run_lane(lane, genome, server, pipeline, num_processors,
                                      node_memory=server.node_mem,
                                      pbs_script_lines=server.pbs_script_lines,
                                      working_dir=lane.output_dir,
-                                     walltime="20:00:00",
+                                     mem=config.ABUNDANT_MAPPING_JOB_MEM,
+                                     walltime=config.ABUNDANT_MAPPING_JOB_WALLTIME,
                                      deps=copy_fastq_deps,
                                      stderr_filename=log_file)
             abundant_mapping_deps.append(job_id)
@@ -147,7 +150,8 @@ def run_lane(lane, genome, server, pipeline, num_processors,
                                  node_memory=server.node_mem,
                                  pbs_script_lines=server.pbs_script_lines,
                                  working_dir=lane.output_dir,
-                                 walltime="10:00:00",
+                                 mem=config.ABUNDANT_FILTER_JOB_MEM,
+                                 walltime=config.ABUNDANT_FILTER_JOB_WALLTIME,
                                  deps=abundant_mapping_deps,
                                  stderr_filename=log_file)
         filtered_fastq_deps = [job_id]
@@ -174,8 +178,8 @@ def run_lane(lane, genome, server, pipeline, num_processors,
                                  node_memory=server.node_mem,
                                  pbs_script_lines=server.pbs_script_lines,
                                  working_dir=lane.output_dir,
-                                 pmem=8192,
-                                 walltime="10:00:00",
+                                 mem=config.ABUNDANT_BAMSORT_JOB_MEM,
+                                 walltime=config.ABUNDANT_BAMSORT_JOB_WALLTIME,
                                  deps=filtered_fastq_deps,
                                  stderr_filename=log_file)
     #
@@ -202,7 +206,8 @@ def run_lane(lane, genome, server, pipeline, num_processors,
                                      node_memory=server.node_mem,
                                      pbs_script_lines=server.pbs_script_lines,
                                      working_dir=lane.output_dir,
-                                     walltime="20:00:00",
+                                     mem=config.XENO_MAPPING_JOB_MEM,
+                                     walltime=config.XENO_MAPPING_JOB_WALLTIME,
                                      deps=filtered_fastq_deps,
                                      stderr_filename=log_file)
             xeno_mapping_deps.append(job_id)
@@ -227,7 +232,8 @@ def run_lane(lane, genome, server, pipeline, num_processors,
                                  node_memory=server.node_mem,
                                  pbs_script_lines=server.pbs_script_lines,
                                  working_dir=lane.output_dir,
-                                 walltime="10:00:00",
+                                 mem=config.XENO_FILTER_JOB_MEM,
+                                 walltime=config.XENO_FILTER_JOB_WALLTIME,
                                  deps=xeno_mapping_deps,
                                  stderr_filename=log_file)
         filter_xeno_deps = [job_id]
@@ -254,7 +260,8 @@ def run_lane(lane, genome, server, pipeline, num_processors,
                                  node_memory=server.node_mem,
                                  pbs_script_lines=server.pbs_script_lines,
                                  working_dir=lane.output_dir,
-                                 walltime="10:00:00",
+                                 mem=config.XENO_BAMSORT_JOB_MEM,
+                                 walltime=config.XENO_BAMSORT_JOB_WALLTIME,
                                  deps=filter_xeno_deps,
                                  stderr_filename=log_file)
     #
@@ -292,7 +299,8 @@ def run_lane(lane, genome, server, pipeline, num_processors,
                                  node_memory=server.node_mem,
                                  pbs_script_lines=server.pbs_script_lines,
                                  working_dir=lane.output_dir,
-                                 walltime="10:00:00",
+                                 mem=config.FRAG_SIZE_JOB_MEM,
+                                 walltime=config.FRAG_SIZE_JOB_WALLTIME,
                                  deps=filtered_fastq_deps,
                                  stderr_filename=log_file)
         frag_size_deps = [job_id]
@@ -326,15 +334,14 @@ def run_lane(lane, genome, server, pipeline, num_processors,
         args.extend(lane.filtered_fastq_files)
         logging.debug("\targs: %s" % (' '.join(map(str, args))))
         log_file = os.path.join(log_dir, "tophat.log")
-        # allocate 16gb to run tophat
         job_id = submit_job_func("tophat_%s" % (lane.id), args,
                                  num_processors=num_processors,
                                  node_processors=server.node_processors,
                                  node_memory=server.node_mem,
                                  pbs_script_lines=server.pbs_script_lines,
                                  working_dir=lane.output_dir,
-                                 mem=16000,
-                                 walltime="72:00:00",
+                                 mem=config.TOPHAT_JOB_MEM,
+                                 walltime=config.TOPHAT_JOB_WALLTIME,
                                  deps=frag_size_deps,
                                  stderr_filename=log_file)
         tophat_deps = [job_id]
@@ -364,8 +371,8 @@ def run_lane(lane, genome, server, pipeline, num_processors,
                         node_memory=server.node_mem,
                         pbs_script_lines=server.pbs_script_lines,
                         working_dir=lane.output_dir,
-                        pmem=8192,
-                        walltime="20:00:00",
+                        mem=config.PICARD_METRICS_JOB_MEM,
+                        walltime=config.PICARD_METRICS_JOB_WALLTIME,
                         deps=tophat_deps,
                         stderr_filename=log_file)
     #
@@ -396,8 +403,8 @@ def run_lane(lane, genome, server, pipeline, num_processors,
                         node_memory=server.node_mem,
                         pbs_script_lines=server.pbs_script_lines,
                         working_dir=lane.output_dir,
-                        pmem=8192,
-                        walltime="20:00:00",
+                        mem=config.PICARD_METRICS_JOB_MEM,
+                        walltime=config.PICARD_METRICS_JOB_WALLTIME,
                         deps=tophat_deps,
                         stderr_filename=log_file)
     #
@@ -420,7 +427,8 @@ def run_lane(lane, genome, server, pipeline, num_processors,
                                  node_memory=server.node_mem,
                                  pbs_script_lines=server.pbs_script_lines,
                                  working_dir=lane.output_dir,
-                                 walltime="20:00:00",
+                                 mem=config.COVERAGE_JOB_MEM,
+                                 walltime=config.COVERAGE_JOB_WALLTIME,
                                  deps=tophat_deps,
                                  stdout_filename=lane.coverage_bedgraph_file,
                                  stderr_filename=log_file)
@@ -445,7 +453,8 @@ def run_lane(lane, genome, server, pipeline, num_processors,
                                  node_memory=server.node_mem,
                                  pbs_script_lines=server.pbs_script_lines,
                                  working_dir=lane.output_dir,
-                                 walltime="20:00:00",
+                                 mem=config.BIGWIG_JOB_MEM,
+                                 walltime=config.BIGWIG_JOB_WALLTIME,
                                  deps=bedgraph_deps,
                                  stderr_filename=log_file)
         bigwig_deps = [job_id]
@@ -509,7 +518,8 @@ def run_library(library, genome, server, pipeline, num_processors,
                                  node_memory=server.node_mem,
                                  pbs_script_lines=server.pbs_script_lines,
                                  working_dir=library.output_dir,
-                                 walltime="10:00:00",
+                                 mem=config.MERGE_FRAG_SIZE_JOB_MEM,
+                                 walltime=config.MERGE_FRAG_SIZE_JOB_WALLTIME,
                                  deps=merge_lane_deps,
                                  stderr_filename=log_file)
         merge_frag_size_deps = [job_id]
@@ -540,12 +550,11 @@ def run_library(library, genome, server, pipeline, num_processors,
                                  node_memory=server.node_mem,
                                  pbs_script_lines=server.pbs_script_lines,
                                  working_dir=library.output_dir,
-                                 walltime="20:00:00",
+                                 mem=config.MERGE_BAM_JOB_MEM,
+                                 walltime=config.MERGE_BAM_JOB_WALLTIME,
                                  deps=merge_lane_deps,
                                  stderr_filename=log_file)
         merge_bam_deps = [job_id]
-    
-    
     #
     # Clean the BAM file before calling SNVs
     #
@@ -568,17 +577,16 @@ def run_library(library, genome, server, pipeline, num_processors,
                                  node_memory=server.node_mem,
                                  pbs_script_lines=server.pbs_script_lines,
                                  working_dir=library.output_dir,
-                                 walltime="60:00:00",
+                                 mem=config.CLEAN_BAM_JOB_MEM,
+                                 walltime=config.CLEAN_BAM_JOB_WALLTIME,
                                  deps=merge_bam_deps,
                                  stderr_filename=log_file)
         cleaning_dep = [job_id]
-
     #
     # call snps
     #
     msg = "Calling SNVs with samtools"
     samtools_snv_deps = [] 
-    
     if up_to_date(library.samtools_vcf_file, library.merged_bam_file):
         logging.info("[SKIPPED] %s" % msg)
     else:
@@ -596,7 +604,8 @@ def run_library(library, genome, server, pipeline, num_processors,
                                  node_memory=server.node_mem,
                                  pbs_script_lines=server.pbs_script_lines,
                                  working_dir=library.output_dir,
-                                 walltime="60:00:00",
+                                 mem=config.SAMTOOLS_VARIANT_JOB_MEM,
+                                 walltime=config.SAMTOOLS_VARIANT_JOB_WALLTIME,
                                  deps=cleaning_dep,
                                  stderr_filename=log_file)
         samtools_snv_deps = [job_id]    
@@ -619,13 +628,13 @@ def run_library(library, genome, server, pipeline, num_processors,
         log_stderr_file = os.path.join(log_dir, "varscan_snp_calling_stderr.log")
         logging.debug("\targs: %s" % (' '.join(map(str, args))))
         job_id = submit_job_func("varscan_%s" % (library.id), args,
-                                 num_processors=server.node_processors/num_processes,#1,
+                                 num_processors=1,
                                  node_processors=server.node_processors,
                                  node_memory=server.node_mem,
-                                 mem=int(round(float(server.node_mem)/num_processes, 0)), #int(round(float(server.node_mem)/2, 0)),
                                  pbs_script_lines=server.pbs_script_lines,
                                  working_dir=library.output_dir,
-                                 walltime="60:00:00",
+                                 mem=config.VARSCAN_VARIANT_JOB_MEM,
+                                 walltime=config.VARSCAN_VARIANT_JOB_WALLTIME,
                                  deps=cleaning_dep,
                                  stdout_filename=log_stdout_file,
                                  stderr_filename=log_stderr_file)
@@ -660,15 +669,14 @@ def run_library(library, genome, server, pipeline, num_processors,
                      library.merged_frag_size_dist_file])
         log_file = os.path.join(log_dir, "cufflinks.log")
         logging.debug("\targs: %s" % (' '.join(map(str, args))))
-        cuff_pmem = int(round(float(24000.0 / num_processors),0))
         job_id = submit_job_func("cuff_%s" % (library.id), args,
                                  num_processors=num_processors,
                                  node_processors=server.node_processors,
                                  node_memory=server.node_mem,
                                  pbs_script_lines=server.pbs_script_lines,
                                  working_dir=library.cufflinks_dir,
-                                 walltime="60:00:00",
-                                 pmem=cuff_pmem,
+                                 mem=config.CUFFLINKS_JOB_MEM,
+                                 walltime=config.CUFFLINKS_JOB_WALLTIME,
                                  deps=merge_bam_deps + merge_frag_size_deps,
                                  stderr_filename=log_file)
         cufflinks_deps = [job_id]   
@@ -711,7 +719,8 @@ def run_sample(sample, genome, server, pipeline, num_processors,
                                  node_memory=server.node_mem,
                                  pbs_script_lines=server.pbs_script_lines,
                                  working_dir=sample.output_dir,
-                                 walltime="1:00:00",
+                                 mem=config.NOTIFY_COMPLETE_JOB_MEM,
+                                 walltime=config.NOTIFY_COMPLETE_JOB_WALLTIME,
                                  email="ae",
                                  deps=lib_deps)
         deps = [job_id]
@@ -743,27 +752,29 @@ def run_sample_group(grp, genome, server, pipeline, num_processors,
                                      node_memory=server.node_mem,
                                      pbs_script_lines=server.pbs_script_lines,
                                      working_dir=sample.output_dir,
-                                     walltime="1:00:00",
+                                     mem=config.CLEANUP_INTERMEDIATE_FILES_JOB_MEM,
+                                     walltime=config.CLEANUP_INTERMEDIATE_FILES_JOB_WALLTIME,
                                      deps=deps)
             sample_deps.append(job_id)
     #
     # write file indicating job is complete
     #
-    deps = []
+    deps = sample_deps
     msg = "Notifying user that job is complete"
-    if os.path.exists(grp.job_complete_file) and (len(sample_deps) == 0):
+    if os.path.exists(grp.rna_job_complete_file) and (len(sample_deps) == 0):
         logging.info("[SKIPPED]: %s" % msg)
     else:
         logging.info(msg)
         args = [sys.executable, os.path.join(_oncoseq_pipeline_dir, "notify_complete.py"),
-                grp.job_complete_file]
-        job_id = submit_job_func("done_%s" % (grp.id), args,
+                grp.rna_job_complete_file]
+        job_id = submit_job_func("rnadone_%s" % (grp.id), args,
                                  num_processors=1,
                                  node_processors=server.node_processors,
                                  node_memory=server.node_mem,
                                  pbs_script_lines=server.pbs_script_lines,
                                  working_dir=grp.output_dir,
-                                 walltime="1:00:00",
+                                 mem=config.NOTIFY_COMPLETE_JOB_MEM,
+                                 walltime=config.NOTIFY_COMPLETE_JOB_WALLTIME,
                                  email="ae",
                                  deps=sample_deps)
         deps = [job_id]

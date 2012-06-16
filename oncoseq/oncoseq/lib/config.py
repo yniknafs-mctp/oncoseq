@@ -29,21 +29,34 @@ REMOTE_CONFIG_XML_FILE = "config.xml"
 REMOTE_CODE_TARGZ_FILE = "code.tar.gz"
 REMOTE_COPY_MAX_SIZE_BYTES = (8 << 30)
 
-# job file constants
+# fastq file names
 READ1_FASTQ_FILE = "read1.fq"
 READ2_FASTQ_FILE = "read2.fq"
 FASTQ_FILES = (READ1_FASTQ_FILE, READ2_FASTQ_FILE)
+
+# copy uncompress sequence step
+COPY_UNCOMPRESS_JOB_MEM = 1000
+COPY_UNCOMPRESS_JOB_WALLTIME = "10:00:00"
 
 # fastqc
 FASTQC_DIR_EXTENSION = "_fastqc"
 FASTQC_DATA_FILE = "fastqc_data.txt"
 FASTQC_REPORT_FILE = "fastqc_report.html"
+FASTQC_JOB_MEM = 2000
+FASTQC_JOB_WALLTIME = "10:00:00"
 
 # abundant sequence mapping
 ABUNDANT_SAM_FILES = ('abundant_hits_read1.sam', 'abundant_hits_read2.sam')
-# filtered fastq files
 ABUNDANT_BAM_FILE = 'abundant_hits.bam'
 SORTED_ABUNDANT_BAM_FILE = 'abundant_hits.srt.bam'
+ABUNDANT_MAPPING_JOB_MEM = 2000
+ABUNDANT_MAPPING_JOB_WALLTIME = "20:00:00"
+ABUNDANT_FILTER_JOB_MEM = 1000
+ABUNDANT_FILTER_JOB_WALLTIME = "10:00:00"
+ABUNDANT_BAMSORT_JOB_MEM = 8192
+ABUNDANT_BAMSORT_JOB_WALLTIME = "10:00:00"
+
+# filtered fastq files
 FILTERED_FASTQ_PREFIX = 'filtered_read'
 FILTERED_FASTQ_FILES = tuple(("%s%d.fq" % (FILTERED_FASTQ_PREFIX,x)) for x in (1,2)) 
 
@@ -52,10 +65,18 @@ XENO_SAM_FILES = ('xeno_hits_read1.sam', 'xeno_hits_read2.sam')
 # filtered fastq files
 XENO_BAM_FILE = 'xeno_hits.bam'
 SORTED_XENO_BAM_FILE = 'xeno_hits.srt.bam'
+XENO_MAPPING_JOB_MEM = 3750
+XENO_MAPPING_JOB_WALLTIME = "20:00:00"
+XENO_FILTER_JOB_MEM = 1000
+XENO_FILTER_JOB_WALLTIME = "10:00:00"
+XENO_BAMSORT_JOB_MEM = 8192
+XENO_BAMSORT_JOB_WALLTIME = "10:00:00"
 
 # fragment size distribution
 FRAG_SIZE_DIST_FILE = "frag_size_dist.txt"
 FRAG_SIZE_DIST_PLOT_FILE = "frag_size_dist_plot.pdf"
+FRAG_SIZE_JOB_MEM = 3750
+FRAG_SIZE_JOB_WALLTIME = "10:00:00"
 
 # TODO: remove chimerascan from pipeline
 # chimerascan gene fusion analysis
@@ -67,6 +88,8 @@ FRAG_SIZE_DIST_PLOT_FILE = "frag_size_dist_plot.pdf"
 TOPHAT_DIR = 'tophat'
 TOPHAT_BAM_FILE = os.path.join(TOPHAT_DIR, "accepted_hits.bam")
 TOPHAT_JUNCTIONS_FILE = os.path.join(TOPHAT_DIR, "junctions.bed")
+TOPHAT_JOB_MEM = 16000
+TOPHAT_JOB_WALLTIME = "72:00:00"
 
 # picard metrics files
 LANE_ALIGNMENT_SUMMARY_METRICS = "lane.alignment_summary_metrics"
@@ -78,34 +101,60 @@ LANE_QUALITY_DISTRIBUTION_METRICS = "lane.quality_distribution_metrics"
 LANE_QUALITY_DISTRIBUTION_PDF = "lane.quality_distribution.pdf"
 LANE_RNASEQ_METRICS = "lane.rnaseq_metrics"
 LANE_RNASEQ_METRICS_PLOT_PDF = "lane.rnaseq_metrics_plot.pdf"
+PICARD_METRICS_JOB_MEM = 8192
+PICARD_METRICS_JOB_WALLTIME = "20:00:00"
 
 # coverage bedgraph file
 COVERAGE_BEDGRAPH_FILE = "coverage.bedgraph"
 COVERAGE_BIGWIG_FILE = "coverage.bigwig"
+COVERAGE_JOB_MEM = 3750
+COVERAGE_JOB_WALLTIME = "20:00:00"
+BIGWIG_JOB_MEM = 3750
+BIGWIG_JOB_WALLTIME = "20:00:00"
 
 # merged alignment results
+MERGED_FRAG_SIZE_DIST_FILE = "merged_frag_size_dist.txt"
 MERGED_BAM_FILE = "merged_alignments.bam"
 MERGED_CLEAN_BAM_FILE = "merged_alignments_srdup.bam"
-MERGED_FRAG_SIZE_DIST_FILE = "merged_frag_size_dist.txt"
+MERGE_FRAG_SIZE_JOB_MEM = 1000
+MERGE_FRAG_SIZE_JOB_WALLTIME = "1:00:00"
+MERGE_BAM_JOB_MEM = 1000
+MERGE_BAM_JOB_WALLTIME = "1:00:00"
+CLEAN_BAM_JOB_MEM = 3750
+CLEAN_BAM_JOB_WALLTIME = "60:00:00"
 
 # snp calling results
 SAMTOOLS_VARIANT_BCF_FILE = "samtools.var.raw.bcf"
 SAMTOOLS_VARIANT_VCF_FILE = "samtools.var.flt.vcf"
+SAMTOOLS_VARIANT_JOB_MEM = 12000
+SAMTOOLS_VARIANT_JOB_WALLTIME = "60:00:00"
 VARSCAN_VARIANT_SNV_FILE = "varscan.snvs.flt.txt"
 VARSCAN_VARIANT_IND_FILE = "varscan.indels.txt"
+VARSCAN_VARIANT_JOB_MEM = 12000
+VARSCAN_VARIANT_JOB_WALLTIME = "60:00:00"
 TUMOR_COSMIC_VCF = "tumor_cosmic_positions.vcf"
 COSMIC_QUAL_VCF = "cov_cosmic_positions.vcf"
-
-# cnv results
-CNV_FILE = "exome.cnvs.txt"
-LOH_FILE = "exome_loh.txt"
-CNV_PLOT = "exome_cnv_plot"
 
 # cufflinks output
 CUFFLINKS_DIR = "cufflinks"
 CUFFLINKS_TRANSCRIPTS_GTF_FILE = os.path.join(CUFFLINKS_DIR, "transcripts.gtf")
 CUFFLINKS_GENES_FILE = os.path.join(CUFFLINKS_DIR, "genes.fpkm_tracking")
 CUFFLINKS_ISOFORMS_FILE = os.path.join(CUFFLINKS_DIR, "isoforms.fpkm_tracking")
+CUFFLINKS_JOB_MEM = 24000
+CUFFLINKS_JOB_WALLTIME = "60:00:00"
+
+# notify complete
+NOTIFY_COMPLETE_JOB_MEM = 500
+NOTIFY_COMPLETE_JOB_WALLTIME = "1:00:00"
+
+# cleanup intermediate files
+CLEANUP_INTERMEDIATE_FILES_JOB_MEM = 500
+CLEANUP_INTERMEDIATE_FILES_JOB_WALLTIME = "1:00:00"
+
+# cnv results
+CNV_FILE = "exome.cnvs.txt"
+LOH_FILE = "exome_loh.txt"
+CNV_PLOT = "exome_cnv_plot"
 
 # files for exome analysis
 # alignment results
@@ -124,6 +173,8 @@ PROBE_COVERAGE_SUMMARY = "probes_coverage_summary.cov"
 
 # job complete
 JOB_COMPLETE_FILE = "job.done"
+DNA_JOB_COMPLETE_FILE = "dnajobs.done"
+RNA_JOB_COMPLETE_FILE = "rnajobs.done"
 
 def get_tophat_library_type(strand_protocol):
     if strand_protocol == "dutp":
@@ -271,9 +322,12 @@ def attach_rnaseq_sample_to_results(sample, root_dir):
 
 def attach_sample_group_to_results(grp, root_dir):
     grp.output_dir = os.path.join(root_dir, grp.id)
-    grp.job_complete_file = os.path.join(grp.output_dir, JOB_COMPLETE_FILE)
     grp.xml_file = os.path.join(grp.output_dir, SAMPLE_GROUP_XML_FILE)
+    grp.job_complete_file = os.path.join(grp.output_dir, JOB_COMPLETE_FILE)
+    # output files produced by rna pipeline
+    grp.rna_job_complete_file = os.path.join(grp.output_dir, RNA_JOB_COMPLETE_FILE)
     # output files produced by exome pipeline
+    grp.dna_job_complete_file = os.path.join(grp.output_dir, DNA_JOB_COMPLETE_FILE)
     grp.samtools_bcf_file = os.path.join(grp.output_dir, SAMTOOLS_VARIANT_BCF_FILE)
     grp.samtools_vcf_file = os.path.join(grp.output_dir, SAMTOOLS_VARIANT_VCF_FILE)
     grp.varscan_snv_file = os.path.join(grp.output_dir, VARSCAN_VARIANT_SNV_FILE)

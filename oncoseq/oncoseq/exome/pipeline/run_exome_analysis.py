@@ -789,13 +789,13 @@ def run_sample_group(grp, genome, server, pipeline, num_processors,
     #
     deps = grp_deps
     msg = "Notifying user that sample group jobs are complete"
-    if os.path.exists(grp.job_complete_file) and (len(grp_deps) == 0):
+    if os.path.exists(grp.dna_job_complete_file) and (len(grp_deps) == 0):
         logging.info("[SKIPPED]: %s" % msg)
     else:
         logging.info(msg)
         args = [sys.executable, os.path.join(_oncoseq_pipeline_dir, "notify_complete.py"),
-                grp.job_complete_file]
-        job_id = submit_job_func("done_%s" % (grp.id), args,
+                grp.dna_job_complete_file]
+        job_id = submit_job_func("dnadone_%s" % (grp.id), args,
                                  num_processors=1,
                                  node_processors=server.node_processors,
                                  node_memory=server.node_mem,
