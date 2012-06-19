@@ -681,7 +681,8 @@ def run_sample_group(grp, genome, server, pipeline, num_processors,
     benign_sample = grp.samples[SAMPLE_TYPE_EXOME_NORMAL]
     if (benign_sample is None) or (tumor_sample is None):
         logging.info("Skipping exome analysis: tumor and/or benign exome samples missing")
-        return config.JOB_SUCCESS
+        #return [config.JOB_SUCCESS]
+        return []
     # process samples
     sample_deps = run_sample(benign_sample, genome, server, pipeline, 
                              num_processors, submit_job_func)
