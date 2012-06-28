@@ -105,7 +105,7 @@ def copy_to_remote(src, dst, remote_address, username, port, maxsize=(8<<30), tm
     src_file_size = os.path.getsize(src)
     if src_file_size > maxsize:
         maxsize_mb = max(1, (maxsize >> 20))
-        num_chunks = 1 + (src_file_size / maxsize_mb)
+        num_chunks = 1 + ((src_file_size >> 20) / maxsize_mb)
         src_prefix = os.path.basename(os.path.splitext(src)[0])
         # make temp dir for split files
         timestamp_string = datetime.datetime.now().strftime("%Y-%m-%d-%H%M%S%f")
