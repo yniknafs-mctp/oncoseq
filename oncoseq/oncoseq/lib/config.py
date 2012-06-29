@@ -114,12 +114,12 @@ BIGWIG_JOB_WALLTIME = "20:00:00"
 
 # merged alignment results
 MERGED_FRAG_SIZE_DIST_FILE = "merged_frag_size_dist.txt"
-MERGED_BAM_FILE = "merged_alignments.bam"
-MERGED_CLEAN_BAM_FILE = "merged_alignments_srdup.bam"
 MERGE_FRAG_SIZE_JOB_MEM = 1000
 MERGE_FRAG_SIZE_JOB_WALLTIME = "1:00:00"
-MERGE_BAM_JOB_MEM = 1000
-MERGE_BAM_JOB_WALLTIME = "1:00:00"
+MERGED_BAM_FILE = "merged_alignments.bam"
+MERGED_CLEAN_BAM_FILE = "merged_alignments_srdup.bam"
+MERGE_BAM_JOB_MEM = 8192
+MERGE_BAM_JOB_WALLTIME = "20:00:00"
 CLEAN_BAM_JOB_MEM = 3750
 CLEAN_BAM_JOB_WALLTIME = "60:00:00"
 
