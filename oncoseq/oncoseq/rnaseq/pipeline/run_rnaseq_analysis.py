@@ -775,7 +775,6 @@ def run_sample_group(grp, genome, server, pipeline, num_processors,
                                  working_dir=grp.output_dir,
                                  mem=config.NOTIFY_COMPLETE_JOB_MEM,
                                  walltime=config.NOTIFY_COMPLETE_JOB_WALLTIME,
-                                 email="ae",
                                  deps=sample_deps)
         deps = [job_id]
     return deps
