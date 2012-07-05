@@ -422,12 +422,11 @@ class AnalysisConfig(object):
 
 class GenomeConfig(object):
     __fields__ = ("root_dir",
-                  "abundant_bowtie_index",
-                  "xeno_bowtie_index",
-                  "genome_bowtie_index",
-                  "genome_bowtie2_index",
+                  "abundant_index",
+                  "foreign_index",
                   "genome_fasta_file",
                   "genome_bwa_index",
+                  "genome_bowtie2_index",
                   "fragment_size_bowtie_index",
                   "gene_annotation_refflat",
                   "picard_ribosomal_intervals",
@@ -460,17 +459,14 @@ class GenomeConfig(object):
         if not os.path.exists(abs_root_dir):
             logging.error("genome root directory %s not found" % (self.root_dir))
             valid = False            
-        if not os.path.exists(os.path.join(abs_root_dir, self.abundant_bowtie_index + ".1.bt2")):
-            logging.error("Abundant bowtie2 index %s not found" % (self.abundant_bowtie_index))
+        if not os.path.exists(os.path.join(abs_root_dir, self.abundant_index + ".1.bt2")):
+            logging.error("Abundant bowtie2 index %s not found" % (self.abundant_index))
             valid = False
-        if not os.path.exists(os.path.join(abs_root_dir, self.abundant_bowtie_index + ".fa")):
-            logging.error("Abundant sequences fasta file %s not found" % (self.abundant_bowtie_index))
+        if not os.path.exists(os.path.join(abs_root_dir, self.abundant_index + ".fa")):
+            logging.error("Abundant sequences fasta file %s not found" % (self.abundant_index))
             valid = False
-        if not os.path.exists(os.path.join(abs_root_dir, self.xeno_bowtie_index + ".1.bt2")):
-            logging.error("Foreign contaminants bowtie2 index %s not found" % (self.xeno_bowtie_index))
-            valid = False
-        if not os.path.exists(os.path.join(abs_root_dir, self.genome_bowtie_index + ".1.ebwt")):
-            logging.error("Genome bowtie index %s not found" % (self.genome_bowtie_index))
+        if not os.path.exists(os.path.join(abs_root_dir, self.foreign_index + ".1.bt2")):
+            logging.error("Foreign contaminants bowtie2 index %s not found" % (self.foreign_index))
             valid = False
         if not os.path.exists(os.path.join(abs_root_dir, self.genome_bowtie2_index + ".1.bt2")):
             logging.error("Genome bowtie2 index %s not found" % (self.genome_bowtie2_index))
@@ -486,7 +482,7 @@ class GenomeConfig(object):
                          "picard_ribosomal_intervals",
                          "chrom_sizes"):
             if not os.path.exists(os.path.join(abs_root_dir, getattr(self, attrname))):
-                logging.error("Genome file %s not found" % (getattr(self, attrname)))
+                logging.error("Annotation file %s not found" % (getattr(self, attrname)))
                 valid = False
         return valid
 

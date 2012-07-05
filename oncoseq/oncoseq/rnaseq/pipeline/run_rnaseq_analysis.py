@@ -108,7 +108,7 @@ def run_lane(lane, genome, server, pipeline, num_processors,
             logging.info("%s read%d" % (msg, readnum+1))
             args = [pipeline.bowtie2_bin, "-p", num_processors, "--phred33",
                     "--end-to-end", "--sensitive", "--reorder", "-M", 200,
-                    "-x", os.path.join(server.references_dir, genome.get_path("abundant_bowtie_index")),
+                    "-x", os.path.join(server.references_dir, genome.get_path("abundant_index")),
                     "-U", lane.copied_fastq_files[readnum],
                     "-S", abundant_sam_file]
             log_file = os.path.join(log_dir, "bowtie2_abundant_seq_read%d.log" % (readnum+1))
@@ -195,7 +195,7 @@ def run_lane(lane, genome, server, pipeline, num_processors,
             logging.info("%s read%d" % (msg, readnum+1))
             args = [pipeline.bowtie2_bin, "-p", num_processors, "--phred33",
                     "--end-to-end", "--sensitive", "--reorder", "-M", 200,
-                    "-x", os.path.join(server.references_dir, genome.get_path("xeno_bowtie_index")),
+                    "-x", os.path.join(server.references_dir, genome.get_path("foreign_index")),
                     "-U", lane.filtered_fastq_files[readnum],
                     "-S", xeno_sam_file]
             log_file = os.path.join(log_dir, "bowtie2_xeno_seq_read%d.log" % (readnum+1))
