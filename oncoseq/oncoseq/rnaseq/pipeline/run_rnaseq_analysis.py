@@ -587,13 +587,13 @@ def run_library(library, genome, server, pipeline, num_processors,
     #
     msg = "Calling SNVs with samtools"
     samtools_snv_deps = [] 
-    if up_to_date(library.samtools_vcf_file, library.merged_bam_file):
+    if up_to_date(library.samtools_vcf_file, library.merged_cleaned_bam_file):
         logging.info("[SKIPPED] %s" % msg)
     else:
         logging.info(msg)
         args = [sys.executable, os.path.join(_rnaseq_pipeline_dir, "call_snps.py"),
                 os.path.join(server.references_dir, genome.get_path("genome_fasta_file")),
-                library.merged_bam_file,
+                library.merged_cleaned_bam_file,
                 library.samtools_bcf_file,
                 library.samtools_vcf_file]
         log_file = os.path.join(log_dir, "samtools_snp_calling.log")
@@ -604,7 +604,7 @@ def run_library(library, genome, server, pipeline, num_processors,
                                  node_memory=server.node_mem,
                                  pbs_script_lines=server.pbs_script_lines,
                                  working_dir=library.output_dir,
-                                 mem=config.SAMTOOLS_VARIANT_JOB_MEM,
+                                 pmem=config.SAMTOOLS_VARIANT_JOB_MEM,
                                  walltime=config.SAMTOOLS_VARIANT_JOB_WALLTIME,
                                  deps=cleaning_dep,
                                  stderr_filename=log_file)
@@ -614,14 +614,14 @@ def run_library(library, genome, server, pipeline, num_processors,
     #
     msg = "Calling SNVs with VarScan"
     varscan_deps = []
-    if up_to_date(library.varscan_snv_file, library.merged_bam_file):
+    if up_to_date(library.varscan_snv_file, library.merged_cleaned_bam_file):
         logging.info("[SKIPPED] %s" % msg)
     else:
         logging.info(msg)
         args = [sys.executable, os.path.join(_rnaseq_pipeline_dir, "call_snps_varscan.py"),
                 "--varscan-dir", pipeline.varscan_dir,
                 os.path.join(server.references_dir, genome.get_path("genome_fasta_file")),
-                library.merged_bam_file,
+                library.merged_cleaned_bam_file,
                 library.varscan_snv_file,
                 library.varscan_indel_file]
         log_stdout_file = os.path.join(log_dir, "varscan_snp_calling_stdout.log")
@@ -679,8 +679,10 @@ def run_library(library, genome, server, pipeline, num_processors,
                                  walltime=config.CUFFLINKS_JOB_WALLTIME,
                                  deps=merge_bam_deps + merge_frag_size_deps,
                                  stderr_filename=log_file)
-        cufflinks_deps = [job_id]   
+        cufflinks_deps = [job_id]
+    
     lib_deps = cufflinks_deps + samtools_snv_deps + varscan_deps
+
     return lib_deps + all_lane_deps
 
 def run_sample(sample, genome, server, pipeline, num_processors,
