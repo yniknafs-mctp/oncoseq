@@ -285,7 +285,10 @@ def attach_rnaseq_library_to_results(library, root_dir):
         lane.fastqc_data_files = []
         lane.fastqc_report_files = []
         for readnum in xrange(len(lane.fastq_files)):
-            fastqc_dir = os.path.join(lane.output_dir, "%s%s" % (os.path.basename(lane.fastq_files[readnum]), FASTQC_DIR_EXTENSION))
+            # if there is a compression extension (.gz, .zip, etc) remove it
+            fastq_exts = os.path.basename(lane.fastq_files[readnum]).split(os.path.extsep)
+            fastq_prefix = os.path.extsep.join(fastq_exts[:2])
+            fastqc_dir = os.path.join(lane.output_dir, "%s%s" % (fastq_prefix, FASTQC_DIR_EXTENSION))
             lane.fastqc_data_files.append(os.path.join(fastqc_dir, FASTQC_DATA_FILE))
             lane.fastqc_report_files.append(os.path.join(fastqc_dir, FASTQC_REPORT_FILE))
         # Abundant SAM files
