@@ -28,7 +28,7 @@ def fixed_depth_coverage_dilutions():
     return depth_cov_list
 
 
-def sample_coverage_dilution(fqa,fqb,outputdir,read_basename,N):
+def sample_coverage_dilution(fqa,fqb,outputdir,read_basename,N,fixed_dilution=False):
     """ 
     get N random headers from a fastq file without reading the
     whole thing into memory 
@@ -43,11 +43,13 @@ def sample_coverage_dilution(fqa,fqb,outputdir,read_basename,N):
 
     rand_records = sorted(random.sample(xrange(records), int(N)))
     
-    #coverage_dilutions = depth_coverage_dilutions(N)
-    coverage_dilutions =fixed_depth_coverage_dilutions()
-    ofan,ofbn=read_basename+'_mate0',read_basename+'_mate1'
+    if fixed_dilution:
+        coverage_dilutions =fixed_depth_coverage_dilutions()
+    else:
+        coverage_dilutions = depth_coverage_dilutions(N)
     
-    print N, coverage_dilutions
+    # start        
+    ofan,ofbn=read_basename+'_mate0',read_basename+'_mate1'
     for depth_cov in coverage_dilutions:
         # Files for mixed samples
         mix = "_depth%d.fq"%(depth_cov)
@@ -98,11 +100,14 @@ def main():
     parser.add_argument("tumor_read_mate1")
     parser.add_argument("outdir")
     parser.add_argument("read_basename")
-    parser.add_argument("-n", type=int, dest="number_of_reads", default=100)        
+    parser.add_argument("-n", type=int, dest="number_of_reads", default=100)
+    parser.add_argument("--fixed-dilution", action="store_true",dest="fixed_dilution", default=False)
+    
     args = parser.parse_args()
     
     return sample_coverage_dilution(args.tumor_read_mate0, args.tumor_read_mate1, 
-                        args.outdir, args.read_basename, args.number_of_reads)
+                        args.outdir, args.read_basename, args.number_of_reads,
+                        args.fixed_dilution)
 
 if __name__ == "__main__":
     '''
