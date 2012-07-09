@@ -19,6 +19,15 @@ def depth_coverage_dilutions(N):
     depth_cov_list = [int(N*(i/float(100))) for i in depth_range]
     return depth_cov_list
 
+def fixed_depth_coverage_dilutions():
+    '''
+    return proportions
+    '''
+    depth_cov_list=range(10000000,100000000,10000000)
+    depth_cov_list.add(5000000)
+    return depth_cov_list
+
+
 def sample_coverage_dilution(fqa,fqb,outputdir,read_basename,N):
     """ 
     get N random headers from a fastq file without reading the
@@ -34,7 +43,8 @@ def sample_coverage_dilution(fqa,fqb,outputdir,read_basename,N):
 
     rand_records = sorted(random.sample(xrange(records), int(N)))
     
-    coverage_dilutions = depth_coverage_dilutions(N)
+    #coverage_dilutions = depth_coverage_dilutions(N)
+    coverage_dilutions =fixed_depth_coverage_dilutions()
     ofan,ofbn=read_basename+'_mate0',read_basename+'_mate1'
     
     print N, coverage_dilutions
@@ -50,8 +60,8 @@ def sample_coverage_dilution(fqa,fqb,outputdir,read_basename,N):
         ofa,ofb=os.path.join(outputdir,ofa), os.path.join(outputdir,ofb)
         suba, subb = open(ofa, "w"), open(ofb, "w")
         
-        # Select proportion of tumor/benign 
-        if depth_cov > 0:
+        # Select number of reads 
+        if depth_cov > 0 and depth_cov <= N:
             tumor_records = sorted(random.sample(rand_records, depth_cov ))        
             rec_no = 0
             # Select reads from the tumor sample
