@@ -24,7 +24,7 @@ def fixed_depth_coverage_dilutions():
     return proportions
     '''
     depth_cov_list=range(10000000,100000000,10000000)
-    depth_cov_list.add(5000000)
+    depth_cov_list.append(5000000)
     return depth_cov_list
 
 
