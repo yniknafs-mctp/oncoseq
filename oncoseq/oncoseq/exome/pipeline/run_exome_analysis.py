@@ -665,8 +665,8 @@ def run_sample(sample, genome, server, pipeline, num_processors,
                                  node_memory=server.node_mem,
                                  pbs_script_lines=server.pbs_script_lines,
                                  working_dir=sample.output_dir,
-                                 walltime=config.BIGWIG_JOB_MEM,
-                                 mem=config.BIGWIG_JOB_WALLTIME,
+                                 walltime=config.BIGWIG_JOB_WALLTIME,
+                                 mem=config.BIGWIG_JOB_MEM,
                                  deps=bedgraph_deps,
                                  stderr_filename=log_file)
         bigwig_deps = [job_id]
@@ -720,7 +720,7 @@ def run_sample_group(grp, genome, server, pipeline, num_processors,
                                  num_processors=1,
                                  node_processors=server.node_processors,
                                  node_memory=server.node_mem,
-                                 mem=config.SAMTOOLS_VARIANT_JOB_MEM,#pmem
+                                 pmem=config.SAMTOOLS_VARIANT_JOB_MEM,#pmem # pmem seems to produce shorter times of execution than mem. do not why ?
                                  pbs_script_lines=server.pbs_script_lines,
                                  working_dir=grp.output_dir,
                                  walltime=config.SAMTOOLS_VARIANT_JOB_WALLTIME,
@@ -777,7 +777,11 @@ def run_sample_group(grp, genome, server, pipeline, num_processors,
                 grp.exome_loh_file,
                 grp.exome_cnv_file,
                 grp.exome_cnv_plot,
-                tumor_sample.merged_cleaned_bam_efile]
+                grp.exome_cnv_rbackup,
+                grp.id,
+                tumor_sample.estimated_tumor_content,
+                tumor_sample.merged_cleaned_bam_efile,
+                ]
         log_stderr_file = os.path.join(log_dir, "exome_cnv_calling_stderr.log")
         log_stdout_file = os.path.join(log_dir, "exome_cnv_calling_stdout.log")
         logging.debug("\targs: %s" % (' '.join(map(str, args))))
@@ -793,6 +797,8 @@ def run_sample_group(grp, genome, server, pipeline, num_processors,
                                  stdout_filename=log_stdout_file,
                                  stderr_filename=log_stderr_file)
         cnv_deps = [job_id]
+    
+        
     # all dependencies for sample group
     grp_deps = samtools_snv_deps + varscan_deps + cnv_deps
     #
