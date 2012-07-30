@@ -84,12 +84,14 @@ def baf_from_varscan(ifile,normal_baf,tumor_baf):
         fields['FILTER']='PASS' if float(fields['QUAL']) >= MIN_QUAL else 'LowQual'
         fields['ID']='.'#fields['CHROM']+'@'+fields['POS'] 
         
-        # Define if the snp is heterozygous or not in the germline.
-        if fields['VFN'] >= 0.1 and fields['VFN'] <= 0.75:
+        # Define if the snp is heterozygous or not in the germline.s
+        if float(fields['VFN']) >= 0.1 and float(fields['VFN']) <= 0.75:
             #write the normal baf and the tumor baf
-            normal_ofile.write( ",".join(print_baf_line(fdict,fields)).replace(',','\t')+'\n')
-            tumor_ofile.write( ",".join(print_baf_line(fdict,fields,False)).replace(',','\t')+'\n')
-
+            normal_ofile.write( "chr"+",".join(print_baf_line(fdict,fields)).replace(',','\t')+'\n')
+            tumor_ofile.write( "chr"+",".join(print_baf_line(fdict,fields,False)).replace(',','\t')+'\n')
+        
+    normal_ofile.close()
+    tumor_ofile.close()
 
 def main():
     logging.basicConfig(level=logging.DEBUG,
