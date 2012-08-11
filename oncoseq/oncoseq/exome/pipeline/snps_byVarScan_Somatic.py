@@ -53,7 +53,7 @@ def call_snps(ref_fa, normal_bam_file, tumor_bam_file,
     
     
     # Call SNVs using varscan
-    dpval= 0.10 # default pvalue to force pvalue calculation
+    dpval,tumor_fraction= 0.10,0.05 # default pvalue to force pvalue calculation
     #f=open(snps_vcf_file,'w')
     #f.close()
     args=["java","-jar",os.path.join(varscan_dir,"varscan"),"somatic", mpileup_n,mpileup_t,  
@@ -76,7 +76,8 @@ def call_snps(ref_fa, normal_bam_file, tumor_bam_file,
           snps_vcf_file_tmp,
           "--indel-file",indels_vcf_file,
           "--output-file",snps_vcf_file,
-          "--p-value",str(dpval)]
+          "--p-value",str(dpval),
+          "--min-var-freq",str(tumor_fraction)]
     args = ",".join(args).replace(',',' ')
     print args
     retcode = subprocess.call(args,shell=True)

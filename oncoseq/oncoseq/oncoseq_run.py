@@ -94,6 +94,8 @@ def run_remote(analysis_file, config_file, server_name, num_processors,
             logging.error("Too many jobs currently running")
             return config.JOB_ERROR
         logging.info("\tjobs in queue: %d" % (num_user_jobs))
+        
+        
     # make working directory for job 
     logging.info("Making directory for job %s" % (job_output_dir))
     ssh_exec(server.address, "mkdir -p %s" % (job_output_dir), server.ssh_port)
@@ -124,16 +126,39 @@ def run_remote(analysis_file, config_file, server_name, num_processors,
                                 setattr(lane, attrname, remote_file)
                             else:
                                 logging.info("Fastq file %s not found on remote server" % (local_file))
+                        
+                        
+                        if server.job_seq_repo_mirror_dir is not None and not found:
+                            # test if file exists at remote temporary server sequence for the jobs 
+                            # that have been run recently.
+                            ext = os.path.splitext(local_file)[-1]
+                            remote_file = os.path.join(server.job_seq_repo_mirror_dir, "%s_%d%s" % (lane.id, readnum+1, ext))
+                            '''
+                            remote_file = os.path.join(server.job_seq_repo_mirror_dir,
+                                                       os.path.basename(local_file))
+                            '''
+                            print remote_file
+                            if test_file_exists(remote_file, server.address, 
+                                                username, server.ssh_port):
+                                logging.info("Found fastq file %s at temporary repository %s" % (local_file, remote_file))
+                                found = True
+                                # modify analysis config to point to remote file
+                                setattr(lane, attrname, remote_file)
+                            else:
+                                logging.info("Fastq file %s not found on temporary remote server" % (local_file))
+
                         if not found:
                             # copy fastq files to remote location and 
                             # replace fastq fields in XML file
                             logging.info("Copying lane %s fastq file" % (lane.id))
                             ext = os.path.splitext(local_file)[-1]
-                            remote_file = os.path.join(job_output_dir, "%s_%d%s" % (lane.id, readnum+1, ext))
+                            remote_file = os.path.join(server.job_seq_repo_mirror_dir, "%s_%d%s" % (lane.id, readnum+1, ext)) #job_output_dir
+                            print server.address
                             retcode = copy_to_remote(local_file, remote_file, 
-                                                     server.address, username, server.ssh_port, 
+                                                     server.xfer_addres, username, server.ssh_port, 
                                                      maxsize=config.REMOTE_COPY_MAX_SIZE_BYTES,
-                                                     tmp_dir=local_tmp_dir)
+                                                     tmp_dir=local_tmp_dir,
+                                                     login_remote_address=server.address) #xfer_addres
                             if retcode != 0:
                                 logging.error("Copy of read 1 failed")
                                 # TODO: cleanup?
@@ -147,7 +172,7 @@ def run_remote(analysis_file, config_file, server_name, num_processors,
     remote_analysis_file = os.path.join(job_output_dir, config.REMOTE_ANALYSIS_XML_FILE)
     local_analysis_file = os.path.join(local_tmp_dir,"tmp_analysis.xml")
     analysis.to_xml(local_analysis_file)
-    scp(local_analysis_file, server.address + ":" + remote_analysis_file, server.ssh_port)
+    scp(local_analysis_file, server.xfer_addres + ":" + remote_analysis_file, server.ssh_port) #xfer_addres
     os.remove(local_analysis_file)
     #
     # copy configuration file to remote location
@@ -156,7 +181,7 @@ def run_remote(analysis_file, config_file, server_name, num_processors,
     remote_config_file = os.path.join(job_output_dir, config.REMOTE_CONFIG_XML_FILE)
     local_config_file = os.path.join(local_tmp_dir, "tmp_pipeline_config.xml")
     pipeline.to_xml(local_config_file)
-    scp(local_config_file, server.address + ":" + remote_config_file, server.ssh_port)
+    scp(local_config_file, server.xfer_addres + ":" + remote_config_file, server.ssh_port)
     os.remove(local_config_file)    
     #
     # package and copy source code to remote location
@@ -171,7 +196,7 @@ def run_remote(analysis_file, config_file, server_name, num_processors,
     # copy source code
     logging.info("Copying source code")
     remote_code_targz = os.path.join(job_output_dir, config.REMOTE_CODE_TARGZ_FILE)
-    scp(source_code_file, server.address + ":" + remote_code_targz, server.ssh_port)
+    scp(source_code_file, server.xfer_addres + ":" + remote_code_targz, server.ssh_port)
     # unpack source code
     logging.info("Unpacking source code")
     ssh_exec(server.address, "tar -C %s -zxvf %s" % (job_output_dir, remote_code_targz), server.ssh_port)

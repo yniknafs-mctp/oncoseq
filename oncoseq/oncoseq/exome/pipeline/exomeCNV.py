@@ -17,7 +17,9 @@ _lib_dir=oncoseq.lib.__path__[0]
 _pipeline_dir = oncoseq.exome.pipeline.__path__[0] 
 
 def run_exomeCNV(samtools_bin, Rscrip_dir, benign_cov, tumor_cov, 
-                     loh_file, cnv_file,cnv_plot,bam_tumor):
+                     loh_file, cnv_file,cnv_plot,r_backup_file,
+                     plot_title,tumor_content_estimate,
+                     bam_tumor):
     '''
     '''
     args = [samtools_bin,"view",bam_tumor,"|", "head", "-n", "1", "|", "cut", "-f", "10"]                
@@ -36,7 +38,10 @@ def run_exomeCNV(samtools_bin, Rscrip_dir, benign_cov, tumor_cov,
                     loh_file,
                     cnv_file,
                     cnv_plot,
+                    r_backup_file,
+                    plot_title,
                     str(tumor_read_length),
+                    tumor_content_estimate,
                     str(1)]#,"TRUE"]
     print args
     retcode = subprocess.call(args)
@@ -56,12 +61,17 @@ def main():
     parser.add_argument("loh_file")
     parser.add_argument("cnv_file")
     parser.add_argument("cnv_plot")
+    parser.add_argument("r_backup_file")
+    parser.add_argument("plot_title")
+    parser.add_argument("tumor_content_estimate")
     parser.add_argument("bam_tumor")
-    
     
     args = parser.parse_args()
     return run_exomeCNV(args.samtools_bin,args.Rscrip_dir, args.normal_cov, args.tumor_cov, 
-                     args.loh_file, args.cnv_file,args.cnv_plot,args.bam_tumor)
+                     args.loh_file, args.cnv_file,
+                     args.cnv_plot,args.r_backup_file,
+                     args.plot_title,args.tumor_content_estimate,
+                     args.bam_tumor)
 
 
 if __name__ == '__main__': 

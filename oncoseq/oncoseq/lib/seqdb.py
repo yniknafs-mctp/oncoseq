@@ -8,6 +8,7 @@ import logging
 import xlrd
 import xml.etree.cElementTree as etree
 import collections
+import sys
 
 # fragment layouts
 FRAGMENT_LAYOUT_SINGLE = "single"
@@ -143,12 +144,14 @@ class Sample(object):
     def __init__(self, **kwargs):
         for attrname in self.__fields__:
             if attrname in kwargs:
-                setattr(self, attrname, kwargs[attrname])        
+                setattr(self, attrname, kwargs[attrname])
+        
         # custom parameters
         self.params = kwargs["params"]
         # relationships
         self.patient = None
         self.libraries = []
+        
 
     @staticmethod
     def from_xml(elem):
@@ -339,7 +342,7 @@ def read_wksheet(wksheet):
     field_descs = wksheet.row_values(1)
     for rownum in xrange(2, wksheet.nrows):
         fields = wksheet.row_values(rownum)
-        # print fields
+        #print fields
         fields = [' '.join(str(field).split('\n')) for field in fields]
         # build dictionary of field names to field values
         field_name_value_dict = dict((field_names[i], fields[i]) for i in xrange(len(fields)))
@@ -431,6 +434,7 @@ class SeqDB(object):
         sample_groups = {}
         for field_dict in read_wksheet(wkbook.sheet_by_name("groups")):
             grp = SampleGroup(**field_dict)
+            print grp.patient_id
             p = patients[grp.patient_id]
             p.sample_groups[grp.id] = grp
             grp.patient = p

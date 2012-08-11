@@ -13,6 +13,7 @@ def qstat_user_job_count(remote_address, username, port):
     command = "qstat -u %s | wc -l" % (username)
     args = map(str, ["ssh", "-p", port, remote_address, '%s' % (command)])
     logging.debug("\targs: %s" % (args))
+    print args
     p = subprocess.Popen(args, stdout=subprocess.PIPE)
     res = p.communicate()[0]
     num_user_jobs = int(res.strip())
@@ -48,6 +49,7 @@ def submit_job_pbs(job_name,
     email: 'None', or string containing codes 'b', 'a', or 'e' describing when to email
     stdout_filename: string filename for storing stdout
     stderr_filename: string filename for storing stderr
+    
     '''    
     if isinstance(args, basestring):
         args = [args] 

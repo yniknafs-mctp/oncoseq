@@ -600,7 +600,7 @@ def run_sample(sample, genome, server, pipeline, num_processors,
         logging.info(msg)
         args = [sys.executable, os.path.join(_exome_pipeline_dir, "target_coverage.py"),
                 sample.merged_cleaned_bam_efile,
-                os.path.join(server.references_dir, genome.get_path("capture_agilent")),#capture_agilent, capture_roche
+                os.path.join(server.references_dir, genome.get_path("capture_agilent")),# "capture_agilent"
                 sample.probe_coverage_file,
                 sample.probe_summary_file,
                 pipeline.vscan_config.min_avgbase_quality]
@@ -762,6 +762,12 @@ def run_sample_group(grp, genome, server, pipeline, num_processors,
     #
     # Running CNV analysis with Exome CNV
     #
+    # If the not tumor content was pass for the tumor sample assign a default value
+    if 'estimated_tumor_content' in tumor_sample.params:
+        estimated_tumor_content=tumor_sample.params['estimated_tumor_content']
+    else:        
+        estimated_tumor_content=config.DEFAULT_TUMOR_CONTENT
+    logging.info("the estimated tumor content is %s",str(estimated_tumor_content))
     msg = "Calling CNVs with ExomeCNV"
     cnv_deps = []
     if (up_to_date(grp.exome_cnv_file, benign_sample.merged_cleaned_bam_efile) and
@@ -779,9 +785,10 @@ def run_sample_group(grp, genome, server, pipeline, num_processors,
                 grp.exome_cnv_plot,
                 grp.exome_cnv_rbackup,
                 grp.id,
-                tumor_sample.estimated_tumor_content,
+                estimated_tumor_content,
                 tumor_sample.merged_cleaned_bam_efile,
                 ]
+             
         log_stderr_file = os.path.join(log_dir, "exome_cnv_calling_stderr.log")
         log_stdout_file = os.path.join(log_dir, "exome_cnv_calling_stdout.log")
         logging.debug("\targs: %s" % (' '.join(map(str, args))))

@@ -3,30 +3,22 @@ Created on Aug 7, 2011
 
 @author: mkiyer
 '''
+import argparse
+import logging
 import sys
 import os
-import logging
-import xml.etree.cElementTree as etree
 
 from oncoseq.lib import config
-from oncoseq.lib.base import up_to_date, indent_xml
-from oncoseq.lib.seqdb import SAMPLE_TYPE_RNASEQ, SAMPLE_TYPE_CAPTURE_RNASEQ
+from oncoseq.lib.config import AnalysisConfig, PipelineConfig
+from oncoseq.lib.cluster import submit_job_pbs, submit_job_nopbs
+from oncoseq.lib.base import up_to_date
 
 # setup pipeline script files
-import oncoseq.pipeline
 import oncoseq.rnaseq.pipeline
-_oncoseq_pipeline_dir = oncoseq.pipeline.__path__[0]
-_rnaseq_pipeline_dir = oncoseq.rnaseq.pipeline.__path__[0]
-num_processes=3 # tmp move to the config file.
+_pipeline_dir = oncoseq.rnaseq.pipeline.__path__[0] 
 
 def run_lane(lane, genome, server, pipeline, num_processors,
              submit_job_func):
-    #
-    # create lane directory
-    # 
-    if not os.path.exists(lane.output_dir):
-        logging.info("Creating directory: %s" % (lane.output_dir))
-        os.makedirs(lane.output_dir)
     #
     # create tmp and log directories
     #
@@ -39,35 +31,6 @@ def run_lane(lane, genome, server, pipeline, num_processors,
         logging.info("Creating directory: %s" % (log_dir))
         os.makedirs(log_dir)
     #
-    # run fastqc program
-    #
-    fastqc_deps = []
-    skip_run = True
-    for readnum in xrange(len(lane.fastq_files)):    
-        skip_run = skip_run and (up_to_date(lane.fastqc_data_files[readnum], lane.fastq_files[readnum]) and
-                                 up_to_date(lane.fastqc_report_files[readnum], lane.fastq_files[readnum]))
-    msg = "Running FASTQC quality assessment"
-    if skip_run:
-        logging.info("[SKIPPED] %s" % msg)
-    else:
-        logging.info("%s" % msg)       
-        num_threads = min(num_processors, len(lane.fastq_files))
-        args = [pipeline.fastqc_bin, 
-                "--threads", num_threads,
-                "-o", lane.output_dir]
-        args.extend(lane.fastq_files)        
-        log_file = os.path.join(log_dir, "fastqc.log")
-        job_id = submit_job_func("fqc_%s" % (lane.id), args,
-                                 num_processors=num_threads,
-                                 node_processors=server.node_processors,
-                                 node_memory=server.node_mem,
-                                 pbs_script_lines=server.pbs_script_lines,
-                                 working_dir=lane.output_dir,
-                                 mem=config.FASTQC_JOB_MEM,
-                                 walltime=config.FASTQC_JOB_WALLTIME,
-                                 stderr_filename=log_file)
-        fastqc_deps.append(job_id)
-    #
     # copy and uncompress reads
     # 
     msg = "Copying and uncompressing read sequences"
@@ -77,10 +40,9 @@ def run_lane(lane, genome, server, pipeline, num_processors,
             logging.info("[SKIPPED] %s read%d" % (msg, readnum+1))
         else:
             logging.info("%s read%d" % (msg, readnum+1))       
-            pyscript = os.path.join(_oncoseq_pipeline_dir, "copy_uncompress_fastq.py")    
+            pyscript = os.path.join(_pipeline_dir, "copy_uncompress_fastq.py")    
             args = [sys.executable, pyscript,
                     "--quals", lane.quality_scores,
-                    "--fastqc-data-files", ",".join(lane.fastqc_data_files),
                     lane.fastq_files[readnum],
                     lane.copied_fastq_files[readnum]]
             log_file = os.path.join(log_dir, "copy_uncompress_fastq_read%d.log" % (readnum+1))
@@ -90,11 +52,36 @@ def run_lane(lane, genome, server, pipeline, num_processors,
                                      node_memory=server.node_mem,
                                      pbs_script_lines=server.pbs_script_lines,
                                      working_dir=lane.output_dir,
-                                     mem=config.COPY_UNCOMPRESS_JOB_MEM,
-                                     walltime=config.COPY_UNCOMPRESS_JOB_WALLTIME,
-                                     deps=fastqc_deps,
+                                     walltime="20:00:00",
                                      stderr_filename=log_file)
             copy_fastq_deps.append(job_id)
+    #
+    # run fastqc program
+    #
+    skip_run = True
+    for readnum in xrange(len(lane.fastq_files)):    
+        skip_run = skip_run and (up_to_date(lane.fastqc_data_files[readnum], lane.copied_fastq_files[readnum]) and
+                                 up_to_date(lane.fastqc_report_files[readnum], lane.copied_fastq_files[readnum]))
+    msg = "Running FASTQC quality assessment"
+    if skip_run:
+        logging.info("[SKIPPED] %s" % msg)
+    else:
+        logging.info("%s" % msg)       
+        num_threads = min(num_processors, len(lane.copied_fastq_files))
+        args = [pipeline.fastqc_bin, 
+                "--threads", num_threads,
+                "-o", lane.output_dir]
+        args.extend(lane.copied_fastq_files)        
+        log_file = os.path.join(log_dir, "fastqc.log")
+        job_id = submit_job_func("fqc_%s" % (lane.id), args,
+                                 num_processors=num_threads,
+                                 node_processors=server.node_processors,
+                                 node_memory=server.node_mem,
+                                 pbs_script_lines=server.pbs_script_lines,
+                                 working_dir=lane.output_dir,
+                                 walltime="10:00:00",
+                                 deps=copy_fastq_deps,
+                                 stderr_filename=log_file)
     #
     # Map reads against abundant sequences
     #    
@@ -108,7 +95,7 @@ def run_lane(lane, genome, server, pipeline, num_processors,
             logging.info("%s read%d" % (msg, readnum+1))
             args = [pipeline.bowtie2_bin, "-p", num_processors, "--phred33",
                     "--end-to-end", "--sensitive", "--reorder", "-M", 200,
-                    "-x", os.path.join(server.references_dir, genome.get_path("abundant_index")),
+                    "-x", os.path.join(server.references_dir, genome.get_path("abundant_bowtie_index")),
                     "-U", lane.copied_fastq_files[readnum],
                     "-S", abundant_sam_file]
             log_file = os.path.join(log_dir, "bowtie2_abundant_seq_read%d.log" % (readnum+1))
@@ -119,8 +106,7 @@ def run_lane(lane, genome, server, pipeline, num_processors,
                                      node_memory=server.node_mem,
                                      pbs_script_lines=server.pbs_script_lines,
                                      working_dir=lane.output_dir,
-                                     mem=config.ABUNDANT_MAPPING_JOB_MEM,
-                                     walltime=config.ABUNDANT_MAPPING_JOB_WALLTIME,
+                                     walltime="20:00:00",
                                      deps=copy_fastq_deps,
                                      stderr_filename=log_file)
             abundant_mapping_deps.append(job_id)
@@ -137,7 +123,7 @@ def run_lane(lane, genome, server, pipeline, num_processors,
         logging.info("[SKIPPED] %s" % (msg))
     else:
         logging.info("%s" % (msg))
-        args = [sys.executable, os.path.join(_rnaseq_pipeline_dir, "filter_abundant_sequences.py"),
+        args = [sys.executable, os.path.join(_pipeline_dir, "filter_abundant_sequences.py"),
                 lane.abundant_bam_file]
         for readnum in xrange(len(lane.fastq_files)):
             args.append(lane.abundant_sam_files[readnum])
@@ -150,8 +136,7 @@ def run_lane(lane, genome, server, pipeline, num_processors,
                                  node_memory=server.node_mem,
                                  pbs_script_lines=server.pbs_script_lines,
                                  working_dir=lane.output_dir,
-                                 mem=config.ABUNDANT_FILTER_JOB_MEM,
-                                 walltime=config.ABUNDANT_FILTER_JOB_WALLTIME,
+                                 walltime="10:00:00",
                                  deps=abundant_mapping_deps,
                                  stderr_filename=log_file)
         filtered_fastq_deps = [job_id]
@@ -178,8 +163,8 @@ def run_lane(lane, genome, server, pipeline, num_processors,
                                  node_memory=server.node_mem,
                                  pbs_script_lines=server.pbs_script_lines,
                                  working_dir=lane.output_dir,
-                                 mem=config.ABUNDANT_BAMSORT_JOB_MEM,
-                                 walltime=config.ABUNDANT_BAMSORT_JOB_WALLTIME,
+                                 pmem=8192,
+                                 walltime="10:00:00",
                                  deps=filtered_fastq_deps,
                                  stderr_filename=log_file)
     #
@@ -195,7 +180,7 @@ def run_lane(lane, genome, server, pipeline, num_processors,
             logging.info("%s read%d" % (msg, readnum+1))
             args = [pipeline.bowtie2_bin, "-p", num_processors, "--phred33",
                     "--end-to-end", "--sensitive", "--reorder", "-M", 200,
-                    "-x", os.path.join(server.references_dir, genome.get_path("foreign_index")),
+                    "-x", os.path.join(server.references_dir, genome.get_path("xeno_bowtie_index")),
                     "-U", lane.filtered_fastq_files[readnum],
                     "-S", xeno_sam_file]
             log_file = os.path.join(log_dir, "bowtie2_xeno_seq_read%d.log" % (readnum+1))
@@ -206,8 +191,7 @@ def run_lane(lane, genome, server, pipeline, num_processors,
                                      node_memory=server.node_mem,
                                      pbs_script_lines=server.pbs_script_lines,
                                      working_dir=lane.output_dir,
-                                     mem=config.XENO_MAPPING_JOB_MEM,
-                                     walltime=config.XENO_MAPPING_JOB_WALLTIME,
+                                     walltime="20:00:00",
                                      deps=filtered_fastq_deps,
                                      stderr_filename=log_file)
             xeno_mapping_deps.append(job_id)
@@ -221,7 +205,7 @@ def run_lane(lane, genome, server, pipeline, num_processors,
         logging.info("[SKIPPED] %s" % (msg))
     else:
         logging.info("%s" % (msg))
-        args = [sys.executable, os.path.join(_rnaseq_pipeline_dir, "filter_unmapped_pairs.py"),
+        args = [sys.executable, os.path.join(_pipeline_dir, "filter_unmapped_pairs.py"),
                 lane.xeno_bam_file]
         args.extend(lane.xeno_sam_files)
         log_file = os.path.join(log_dir, "filter_xeno_sequences.log")
@@ -232,8 +216,7 @@ def run_lane(lane, genome, server, pipeline, num_processors,
                                  node_memory=server.node_mem,
                                  pbs_script_lines=server.pbs_script_lines,
                                  working_dir=lane.output_dir,
-                                 mem=config.XENO_FILTER_JOB_MEM,
-                                 walltime=config.XENO_FILTER_JOB_WALLTIME,
+                                 walltime="10:00:00",
                                  deps=xeno_mapping_deps,
                                  stderr_filename=log_file)
         filter_xeno_deps = [job_id]
@@ -260,8 +243,7 @@ def run_lane(lane, genome, server, pipeline, num_processors,
                                  node_memory=server.node_mem,
                                  pbs_script_lines=server.pbs_script_lines,
                                  working_dir=lane.output_dir,
-                                 mem=config.XENO_BAMSORT_JOB_MEM,
-                                 walltime=config.XENO_BAMSORT_JOB_WALLTIME,
+                                 walltime="10:00:00",
                                  deps=filter_xeno_deps,
                                  stderr_filename=log_file)
     #
@@ -275,7 +257,7 @@ def run_lane(lane, genome, server, pipeline, num_processors,
     else:
         logging.info("%s" % (msg))
         args = [sys.executable, 
-                os.path.join(_rnaseq_pipeline_dir, "estimate_fragment_size_distribution.py"),
+                os.path.join(_pipeline_dir, "estimate_fragment_size_distribution.py"),
                 "--min-fragment-size", pipeline.min_fragment_size,
                 "--max-fragment-size", pipeline.max_fragment_size,
                 "--bowtie-bin", pipeline.bowtie_bin,
@@ -299,11 +281,56 @@ def run_lane(lane, genome, server, pipeline, num_processors,
                                  node_memory=server.node_mem,
                                  pbs_script_lines=server.pbs_script_lines,
                                  working_dir=lane.output_dir,
-                                 mem=config.FRAG_SIZE_JOB_MEM,
-                                 walltime=config.FRAG_SIZE_JOB_WALLTIME,
+                                 walltime="10:00:00",
                                  deps=filtered_fastq_deps,
                                  stderr_filename=log_file)
         frag_size_deps = [job_id]
+    #
+    # run chimerascan gene fusion discovery tool
+    #
+    chimerascan_deps = []
+    if len(lane.filtered_fastq_files) > 1:
+        msg = "Finding gene fusions with chimerascan"
+        if (up_to_date(lane.chimerascan_results_file, lane.frag_size_dist_file) and
+            all(up_to_date(lane.chimerascan_results_file, f) for f in lane.filtered_fastq_files)):
+            logging.info("[SKIPPED] %s" % (msg))
+        else:
+            logging.info("%s" % (msg))
+            args = [sys.executable, os.path.join(_pipeline_dir, "run_chimerascan.py"),
+                    "-p", num_processors,
+                    "--library-type", config.get_tophat_library_type(lane.library.strand_protocol),
+                    "--trim5", pipeline.chimerascan_config.trim5,
+                    "--trim3", pipeline.chimerascan_config.trim3,
+                    "--frag-size-percentile", pipeline.chimerascan_config.frag_size_percentile]
+            for arg in pipeline.chimerascan_config.args:
+                # substitute species-specific root directory
+                species_arg = arg.replace("${SPECIES}", os.path.join(server.references_dir, genome.root_dir)) 
+                args.append('--arg="%s"' % species_arg)
+            # substitute species-specific index    
+            index = pipeline.chimerascan_config.index
+            species_index = index.replace("${SPECIES}", os.path.join(server.references_dir, genome.root_dir)) 
+            args.extend([lane.chimerascan_dir,
+                         species_index,
+                         lane.frag_size_dist_file])
+            args.extend(lane.filtered_fastq_files)
+            logging.debug("\targs: %s" % (' '.join(map(str, args))))
+            log_file = os.path.join(log_dir, "chimerascan.log")
+            # TODO: allocate 11.25gb per processor to run?!?
+            chimerascan_processors = min(4, server.node_processors, num_processors)
+            chimerascan_mem = 11250
+            job_id = submit_job_func("chimera_%s" % (lane.id), args,
+                                     num_processors=chimerascan_processors,
+                                     node_processors=server.node_processors,
+                                     node_memory=server.node_mem,
+                                     pbs_script_lines=server.pbs_script_lines,
+                                     working_dir=lane.output_dir,
+                                     pmem=chimerascan_mem,
+                                     walltime="60:00:00",
+                                     deps=frag_size_deps,
+                                     stderr_filename=log_file)
+            chimerascan_deps = [job_id]
+    else:
+        logging.info("[SKIPPED] Cannot run chimerascan on single-end libraries")
     #
     # align reads with tophat
     #
@@ -314,7 +341,7 @@ def run_lane(lane, genome, server, pipeline, num_processors,
         logging.info("[SKIPPED] %s" % (msg))
     else:
         logging.info("%s" % (msg))
-        args = [sys.executable, os.path.join(_rnaseq_pipeline_dir, "run_tophat.py"),
+        args = [sys.executable, os.path.join(_pipeline_dir, "run_tophat.py"),
                 "-p", num_processors,
                 "--library-type", config.get_tophat_library_type(lane.library.strand_protocol),
                 '--rg-id', lane.id,
@@ -329,19 +356,21 @@ def run_lane(lane, genome, server, pipeline, num_processors,
             species_arg = arg.replace("${SPECIES}", os.path.join(server.references_dir, genome.root_dir)) 
             args.extend(['--tophat-arg="%s"' % species_arg])
         args.extend([lane.tophat_dir,
-                     os.path.join(server.references_dir, genome.get_path("genome_bowtie2_index")),
+                     os.path.join(server.references_dir, genome.get_path("genome_bowtie_index")),
                      lane.frag_size_dist_file])
         args.extend(lane.filtered_fastq_files)
         logging.debug("\targs: %s" % (' '.join(map(str, args))))
         log_file = os.path.join(log_dir, "tophat.log")
+        # allocate 10gb to run tophat
+        tophat_pmem = int(round(float(10000.0 / num_processors),0))
         job_id = submit_job_func("tophat_%s" % (lane.id), args,
                                  num_processors=num_processors,
                                  node_processors=server.node_processors,
                                  node_memory=server.node_mem,
                                  pbs_script_lines=server.pbs_script_lines,
                                  working_dir=lane.output_dir,
-                                 mem=config.TOPHAT_JOB_MEM,
-                                 walltime=config.TOPHAT_JOB_WALLTIME,
+                                 pmem=tophat_pmem,
+                                 walltime="80:00:00",
                                  deps=frag_size_deps,
                                  stderr_filename=log_file)
         tophat_deps = [job_id]
@@ -371,8 +400,8 @@ def run_lane(lane, genome, server, pipeline, num_processors,
                         node_memory=server.node_mem,
                         pbs_script_lines=server.pbs_script_lines,
                         working_dir=lane.output_dir,
-                        mem=config.PICARD_METRICS_JOB_MEM,
-                        walltime=config.PICARD_METRICS_JOB_WALLTIME,
+                        pmem=8192,
+                        walltime="20:00:00",
                         deps=tophat_deps,
                         stderr_filename=log_file)
     #
@@ -403,8 +432,8 @@ def run_lane(lane, genome, server, pipeline, num_processors,
                         node_memory=server.node_mem,
                         pbs_script_lines=server.pbs_script_lines,
                         working_dir=lane.output_dir,
-                        mem=config.PICARD_METRICS_JOB_MEM,
-                        walltime=config.PICARD_METRICS_JOB_WALLTIME,
+                        pmem=8192,
+                        walltime="20:00:00",
                         deps=tophat_deps,
                         stderr_filename=log_file)
     #
@@ -427,8 +456,7 @@ def run_lane(lane, genome, server, pipeline, num_processors,
                                  node_memory=server.node_mem,
                                  pbs_script_lines=server.pbs_script_lines,
                                  working_dir=lane.output_dir,
-                                 mem=config.COVERAGE_JOB_MEM,
-                                 walltime=config.COVERAGE_JOB_WALLTIME,
+                                 walltime="20:00:00",
                                  deps=tophat_deps,
                                  stdout_filename=lane.coverage_bedgraph_file,
                                  stderr_filename=log_file)
@@ -453,26 +481,27 @@ def run_lane(lane, genome, server, pipeline, num_processors,
                                  node_memory=server.node_mem,
                                  pbs_script_lines=server.pbs_script_lines,
                                  working_dir=lane.output_dir,
-                                 mem=config.BIGWIG_JOB_MEM,
-                                 walltime=config.BIGWIG_JOB_WALLTIME,
+                                 walltime="20:00:00",
                                  deps=bedgraph_deps,
                                  stderr_filename=log_file)
         bigwig_deps = [job_id]
-    return tophat_deps, tophat_deps + bigwig_deps
+    return tophat_deps, tophat_deps + chimerascan_deps + bigwig_deps
 
 
 def run_library(library, genome, server, pipeline, num_processors,
                 submit_job_func):
-    # create library directory
-    if not os.path.exists(library.output_dir):
-        logging.info("Creating directory: %s" % (library.output_dir))
-        os.makedirs(library.output_dir)       
     merge_lane_deps = []
     all_lane_deps = []
     has_paired_end = False
     frag_size_dist_files = []
     for lane in library.lanes:
         logging.info("Analyzing lane: %s" % (lane.id))
+        #
+        # create lane directory
+        # 
+        if not os.path.exists(lane.output_dir):
+            logging.info("Creating directory: %s" % (lane.output_dir))
+            os.makedirs(lane.output_dir)
         #
         # process lane
         #
@@ -507,7 +536,7 @@ def run_library(library, genome, server, pipeline, num_processors,
     else:
         logging.info(msg)
         args = [sys.executable, 
-                os.path.join(_rnaseq_pipeline_dir, "merge_fragment_size_distributions.py"),
+                os.path.join(_pipeline_dir, "merge_fragment_size_distributions.py"),
                 library.merged_frag_size_dist_file]
         args.extend(frag_size_dist_files)
         log_file = os.path.join(log_dir, "merge_fragment_size_distributions.log")
@@ -518,8 +547,7 @@ def run_library(library, genome, server, pipeline, num_processors,
                                  node_memory=server.node_mem,
                                  pbs_script_lines=server.pbs_script_lines,
                                  working_dir=library.output_dir,
-                                 mem=config.MERGE_FRAG_SIZE_JOB_MEM,
-                                 walltime=config.MERGE_FRAG_SIZE_JOB_WALLTIME,
+                                 walltime="10:00:00",
                                  deps=merge_lane_deps,
                                  stderr_filename=log_file)
         merge_frag_size_deps = [job_id]
@@ -550,11 +578,12 @@ def run_library(library, genome, server, pipeline, num_processors,
                                  node_memory=server.node_mem,
                                  pbs_script_lines=server.pbs_script_lines,
                                  working_dir=library.output_dir,
-                                 mem=config.MERGE_BAM_JOB_MEM,
-                                 walltime=config.MERGE_BAM_JOB_WALLTIME,
+                                 walltime="20:00:00",
                                  deps=merge_lane_deps,
                                  stderr_filename=log_file)
         merge_bam_deps = [job_id]
+    
+    
     #
     # Clean the BAM file before calling SNVs
     #
@@ -564,11 +593,12 @@ def run_library(library, genome, server, pipeline, num_processors,
         logging.info("[SKIPPED] %s" % msg)
     else:
         logging.info(msg)
-        args = [sys.executable, os.path.join(_oncoseq_pipeline_dir, "bam_cleaner.py"),
+        args = [sys.executable, os.path.join(_pipeline_dir, "bam_cleaner.py"),
                 "--picard-dir",pipeline.picard_dir,
                 "--tmp-dir",tmp_dir,
                 library.merged_bam_file,
-                library.merged_cleaned_bam_file]       
+                library.merged_cleaned_bam_file]
+        
         log_file = os.path.join(log_dir, "bam_cleaning.log")
         logging.debug("\targs: %s" % (' '.join(map(str, args))))
         job_id = submit_job_func("bamcln_%s" % (library.id), args,
@@ -577,23 +607,24 @@ def run_library(library, genome, server, pipeline, num_processors,
                                  node_memory=server.node_mem,
                                  pbs_script_lines=server.pbs_script_lines,
                                  working_dir=library.output_dir,
-                                 mem=config.CLEAN_BAM_JOB_MEM,
-                                 walltime=config.CLEAN_BAM_JOB_WALLTIME,
+                                 walltime="60:00:00",
                                  deps=merge_bam_deps,
                                  stderr_filename=log_file)
         cleaning_dep = [job_id]
+
     #
     # call snps
     #
     msg = "Calling SNVs with samtools"
     samtools_snv_deps = [] 
-    if up_to_date(library.samtools_vcf_file, library.merged_cleaned_bam_file):
+    
+    if up_to_date(library.samtools_vcf_file, library.merged_bam_file):
         logging.info("[SKIPPED] %s" % msg)
     else:
         logging.info(msg)
-        args = [sys.executable, os.path.join(_rnaseq_pipeline_dir, "call_snps.py"),
+        args = [sys.executable, os.path.join(_pipeline_dir, "call_snps.py"),
                 os.path.join(server.references_dir, genome.get_path("genome_fasta_file")),
-                library.merged_cleaned_bam_file,
+                library.merged_bam_file,
                 library.samtools_bcf_file,
                 library.samtools_vcf_file]
         log_file = os.path.join(log_dir, "samtools_snp_calling.log")
@@ -604,8 +635,7 @@ def run_library(library, genome, server, pipeline, num_processors,
                                  node_memory=server.node_mem,
                                  pbs_script_lines=server.pbs_script_lines,
                                  working_dir=library.output_dir,
-                                 pmem=config.SAMTOOLS_VARIANT_JOB_MEM, # pmem seems to produce shorter times of execution than mem. do not why ?
-                                 walltime=config.SAMTOOLS_VARIANT_JOB_WALLTIME,
+                                 walltime="60:00:00",
                                  deps=cleaning_dep,
                                  stderr_filename=log_file)
         samtools_snv_deps = [job_id]    
@@ -614,14 +644,14 @@ def run_library(library, genome, server, pipeline, num_processors,
     #
     msg = "Calling SNVs with VarScan"
     varscan_deps = []
-    if up_to_date(library.varscan_snv_file, library.merged_cleaned_bam_file):
+    if up_to_date(library.varscan_snv_file, library.merged_bam_file):
         logging.info("[SKIPPED] %s" % msg)
     else:
         logging.info(msg)
-        args = [sys.executable, os.path.join(_rnaseq_pipeline_dir, "call_snps_varscan.py"),
+        args = [sys.executable, os.path.join(_pipeline_dir, "call_snps_varscan.py"),
                 "--varscan-dir", pipeline.varscan_dir,
                 os.path.join(server.references_dir, genome.get_path("genome_fasta_file")),
-                library.merged_cleaned_bam_file,
+                library.merged_bam_file,
                 library.varscan_snv_file,
                 library.varscan_indel_file]
         log_stdout_file = os.path.join(log_dir, "varscan_snp_calling_stdout.log")
@@ -631,14 +661,15 @@ def run_library(library, genome, server, pipeline, num_processors,
                                  num_processors=1,
                                  node_processors=server.node_processors,
                                  node_memory=server.node_mem,
+                                 pmem= int(round(float(server.node_mem)/2, 0)),
                                  pbs_script_lines=server.pbs_script_lines,
                                  working_dir=library.output_dir,
-                                 mem=config.VARSCAN_VARIANT_JOB_MEM,
-                                 walltime=config.VARSCAN_VARIANT_JOB_WALLTIME,
+                                 walltime="60:00:00",
                                  deps=cleaning_dep,
                                  stdout_filename=log_stdout_file,
                                  stderr_filename=log_stderr_file)
         varscan_deps = [job_id]
+        
     #
     # run cufflinks to estimate transcript abundance of known genes
     #
@@ -653,7 +684,7 @@ def run_library(library, genome, server, pipeline, num_processors,
         if not os.path.exists(library.cufflinks_dir):
             logging.info("\tcreating directory: %s" % (library.cufflinks_dir))
             os.makedirs(library.cufflinks_dir)
-        args = [sys.executable, os.path.join(_rnaseq_pipeline_dir, "run_cufflinks.py"),
+        args = [sys.executable, os.path.join(_pipeline_dir, "run_cufflinks.py"),
                 "--cufflinks-bin", pipeline.cufflinks_bin,
                 "-p", num_processors,
                 "-L", library.id,
@@ -669,113 +700,163 @@ def run_library(library, genome, server, pipeline, num_processors,
                      library.merged_frag_size_dist_file])
         log_file = os.path.join(log_dir, "cufflinks.log")
         logging.debug("\targs: %s" % (' '.join(map(str, args))))
+        cuff_pmem = int(round(float(24000.0 / num_processors),0))
         job_id = submit_job_func("cuff_%s" % (library.id), args,
                                  num_processors=num_processors,
                                  node_processors=server.node_processors,
                                  node_memory=server.node_mem,
                                  pbs_script_lines=server.pbs_script_lines,
                                  working_dir=library.cufflinks_dir,
-                                 mem=config.CUFFLINKS_JOB_MEM,
-                                 walltime=config.CUFFLINKS_JOB_WALLTIME,
+                                 walltime="60:00:00",
+                                 pmem=cuff_pmem,
                                  deps=merge_bam_deps + merge_frag_size_deps,
                                  stderr_filename=log_file)
         cufflinks_deps = [job_id]
     lib_deps = cufflinks_deps + samtools_snv_deps + varscan_deps
-
     return lib_deps + all_lane_deps
 
 def run_sample(sample, genome, server, pipeline, num_processors,
-               submit_job_func, keep_tmp):
-    # create directory
-    if not os.path.exists(sample.output_dir):
-        logging.info("Creating directory: %s" % (sample.output_dir))
-        os.makedirs(sample.output_dir)
-    # output sample XML
-    root = etree.Element("analysis")
-    sample.to_xml(root)
-    indent_xml(root)
-    f = open(sample.xml_file, "w")
-    print >>f, etree.tostring(root)
-    f.close()
-    # run libraries
-    lib_deps = []
+               submit_job_func):
+    deps = []
     for library in sample.libraries:
         logging.info("Analyzing library: %s" % (library.id)) 
-        lib_deps.extend(run_library(library, genome, server, pipeline, num_processors, 
-                                    submit_job_func))
-    #
-    # write file indicating job is complete
-    #
-    deps = lib_deps
-    msg = "Notifying user that job is complete"
-    if os.path.exists(sample.job_complete_file) and (len(lib_deps) == 0):
-        logging.info("[SKIPPED]: %s" % msg)
-    else:
-        logging.info(msg)
-        args = [sys.executable, os.path.join(_oncoseq_pipeline_dir, "notify_complete.py"),
-                sample.job_complete_file]
-        job_id = submit_job_func("done_%s" % (sample.id), args,
-                                 num_processors=1,
-                                 node_processors=server.node_processors,
-                                 node_memory=server.node_mem,
-                                 pbs_script_lines=server.pbs_script_lines,
-                                 working_dir=sample.output_dir,
-                                 mem=config.NOTIFY_COMPLETE_JOB_MEM,
-                                 walltime=config.NOTIFY_COMPLETE_JOB_WALLTIME,
-                                 email="ae",
-                                 deps=lib_deps)
-        deps = [job_id]
+        #
+        # create library directory
+        # 
+        if not os.path.exists(library.output_dir):
+            logging.info("Creating directory: %s" % (library.output_dir))
+            os.makedirs(library.output_dir)
+        deps.extend(run_library(library, genome, server, pipeline, num_processors, 
+                                submit_job_func))
     return deps
 
-def run_sample_group(grp, genome, server, pipeline, num_processors,
-                     submit_job_func, keep_tmp):
+def run_analysis(analysis_file, config_file, server_name,
+                 num_processors, keep_tmp, rm_fastq):
+    """
+    rm_fastq: (True/False) delete fastq files after run
+    keep_tmp: (True/False) delete temporary files after run
+    """
     #
-    # process sample
+    # read configuration files
     #
-    sample_deps = []
-    for sample_type in (SAMPLE_TYPE_RNASEQ, SAMPLE_TYPE_CAPTURE_RNASEQ):        
-        sample = grp.samples[sample_type]
-        if sample is None:
+    analysis = AnalysisConfig.from_xml(analysis_file)
+    pipeline = PipelineConfig.from_xml(config_file)
+    #
+    # validate configuration files
+    #
+    if not analysis.is_valid():
+        logging.error("Analysis config not valid")
+        return config.JOB_ERROR
+    
+    if not pipeline.is_valid(server_name, analysis.species):
+        logging.error("Pipeline config not valid")
+        return config.JOB_ERROR
+        
+    # setup server
+    server = pipeline.servers[server_name]
+    if server.pbs:
+        submit_job_func = submit_job_pbs
+    else:
+        submit_job_func = submit_job_nopbs
+    # setup genome references
+    genome = pipeline.species[analysis.species]
+    #
+    # attach analysis to pipeline output directory
+    #
+    analysis.attach_to_results(server.output_dir)    
+    #
+    # process each sample in analysis
+    #
+    deps = []
+    # TODO:03-17-12 Change the loop here because attach_to_results modification
+    # for patient, sample in patients.iteritems():
+    #    for sample in samples:
+    # Reason: attach_to_results function in config was modified to use the patient structure, and not analysis.samples
+    # NOTE: Maybe this not need to be changed. Because the analysis.samples exist and the folder structure is correctly generated by 
+    # analysis attach_to_results. Decide after performing run test.
+    
+    for sample in analysis.samples:
+        print sample.protocol, config.RNASEQ, config.RNASEQ_CAPTURE
+        print len(sample.protocol), len(config.RNASEQ), len(config.RNASEQ_CAPTURE)
+        rna_protocols=[config.RNASEQ,config.RNASEQ_CAPTURE]
+        if sample.protocol not in rna_protocols:
+            logging.info("IN RNASEQ protocol SKIPPING sample: %s, because protocol is %s, %s, %s" % (sample.id,sample.protocol, config.RNASEQ_CAPTURE,config.RNASEQ))
             continue
-        deps = run_sample(sample, genome, server, pipeline, 
-                          num_processors, submit_job_func, keep_tmp)
+            
+        logging.info("Analyzing sample: %s of protocol %s" % (sample.id,sample.protocol))        
+        #
+        # create output dir
+        #
+        if not os.path.exists(sample.output_dir):
+            logging.info("Creating sample directory: %s" % (sample.output_dir))
+            os.makedirs(sample.output_dir)
+        #
+        # process sample
+        #        
+        sample_deps = run_sample(sample, genome, server, pipeline, 
+                                 num_processors, submit_job_func)
+        #
         # cleanup temporary files
-        if keep_tmp:
-            sample_deps.extend(deps)
-        else:
+        #
+        if not keep_tmp:
             msg = "Cleaning up temporary files"
             logging.info(msg)
-            args = [sys.executable, os.path.join(_rnaseq_pipeline_dir, "cleanup_intermediate_files.py")]
-            args.extend([os.path.abspath(sample.xml_file), grp.output_dir, sample.id])
+            args = [sys.executable, os.path.join(_pipeline_dir, "cleanup_intermediate_files.py")]
+            if rm_fastq:
+                args.append("--rm-fastq")
+            args.extend([os.path.abspath(analysis_file), server.output_dir, sample.id])
             job_id = submit_job_func("rm_%s" % (sample.id), args,
                                      num_processors=1,
                                      node_processors=server.node_processors,
                                      node_memory=server.node_mem,
                                      pbs_script_lines=server.pbs_script_lines,
                                      working_dir=sample.output_dir,
-                                     mem=config.CLEANUP_INTERMEDIATE_FILES_JOB_MEM,
-                                     walltime=config.CLEANUP_INTERMEDIATE_FILES_JOB_WALLTIME,
-                                     deps=deps)
-            sample_deps.append(job_id)
-    #
-    # write file indicating job is complete
-    #
-    deps = sample_deps
-    msg = "Notifying user that job is complete"
-    if os.path.exists(grp.rna_job_complete_file) and (len(sample_deps) == 0):
-        logging.info("[SKIPPED]: %s" % msg)
-    else:
-        logging.info(msg)
-        args = [sys.executable, os.path.join(_oncoseq_pipeline_dir, "notify_complete.py"),
-                grp.rna_job_complete_file]
-        job_id = submit_job_func("rnadone_%s" % (grp.id), args,
-                                 num_processors=1,
-                                 node_processors=server.node_processors,
-                                 node_memory=server.node_mem,
-                                 pbs_script_lines=server.pbs_script_lines,
-                                 working_dir=grp.output_dir,
-                                 mem=config.NOTIFY_COMPLETE_JOB_MEM,
-                                 walltime=config.NOTIFY_COMPLETE_JOB_WALLTIME,
-                                 deps=sample_deps)
-        deps = [job_id]
-    return deps
+                                     walltime="1:00:00",
+                                     deps=sample_deps)
+            sample_deps = [job_id]
+        #
+        # write file indicating job is complete
+        #
+        
+        msg = "Notifying user that job is complete"
+        if os.path.exists(sample.job_complete_file) and (len(sample_deps) == 0):
+            logging.info("[SKIPPED]: %s" % msg)
+        else:
+            logging.info(msg)
+            args = [sys.executable, os.path.join(_pipeline_dir, "notify_complete.py"),
+                    sample.job_complete_file]
+            job_id = submit_job_func("done_%s" % (sample.id), args,
+                                     num_processors=1,
+                                     node_processors=server.node_processors,
+                                     node_memory=server.node_mem,
+                                     pbs_script_lines=server.pbs_script_lines,
+                                     working_dir=sample.output_dir,
+                                     walltime="1:00:00",
+                                     email="ae",
+                                     deps=sample_deps)
+            sample_deps = [job_id]
+        deps.extend(sample_deps)
+         
+    return config.JOB_SUCCESS
+
+
+def main():
+    logging.basicConfig(level=logging.DEBUG,
+                        format="%(asctime)s - %(name)s - %(levelname)s - %(message)s")
+    parser = argparse.ArgumentParser()
+    parser.add_argument("-p", type=int, dest="num_processors", default=1)
+    parser.add_argument("--keep-tmp", action="store_true", dest="keep_tmp", default=False)
+    parser.add_argument("--rm-fastq", action="store_true", dest="rm_fastq", default=False)
+    parser.add_argument("analysis_file")
+    parser.add_argument("config_file")
+    parser.add_argument("server_name")
+    args = parser.parse_args()
+    return run_analysis(args.analysis_file, args.config_file, 
+                        args.server_name, 
+                        num_processors=args.num_processors,
+                        keep_tmp=args.keep_tmp,
+                        rm_fastq=args.rm_fastq)
+    
+if __name__ == '__main__': 
+    #sys.exit(0)
+    sys.exit(main())

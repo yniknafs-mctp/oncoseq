@@ -29,6 +29,7 @@ def get_remote_file_size(remote_file, remote_address, username, port):
     command = "du -b %s" % (remote_file)
     args = map(str, ["ssh", "-p", port, remote_address, '%s' % (command)])
     logging.debug("\targs: %s" % (args))
+    print args
     p = subprocess.Popen(args, stdout=subprocess.PIPE)
     res = p.communicate()[0]
     file_size_bytes = int(res.strip().split()[0])
@@ -96,7 +97,7 @@ def globus_copy_file(src, dst, remote_address, username, port):
     
     return 0
 
-def copy_to_remote(src, dst, remote_address, username, port, maxsize=(8<<30), tmp_dir="/tmp"):
+def copy_to_remote(src, dst, remote_address, username, port, maxsize=(8<<30), tmp_dir="/tmp",login_remote_address=None,):
     # maxsize should be bigger than 1mb
     maxsize = max(maxsize, (1<<20))
     # get compression status of src file
@@ -135,11 +136,11 @@ def copy_to_remote(src, dst, remote_address, username, port, maxsize=(8<<30), tm
     else:
         scp(src, remote_address + ":" + dst, port, use_compression=(not is_compressed))
     # check that copy worked by comparing file sizes
-    remote_file_size = get_remote_file_size(dst, remote_address, username, port)
+    remote_file_size = get_remote_file_size(dst, login_remote_address, username, port)
     if src_file_size != remote_file_size:
         logging.error("\tcopy failed (remote file size != local file size)")
         # cleanup by removing destination file
-        retcode = ssh_exec(remote_address, "rm %s" % (dst), port)        
+        retcode = ssh_exec(login_remote_address, "rm %s" % (dst), port)        
         return JOB_ERROR
     else:
         logging.debug("\tremote file size of %d bytes matches local file size" % (src_file_size))

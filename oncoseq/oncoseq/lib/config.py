@@ -3,6 +3,7 @@ Created on Aug 3, 2011
 
 @author: mkiyer
 '''
+import sys
 import os
 import logging
 import xml.etree.cElementTree as etree
@@ -49,9 +50,9 @@ FASTQC_JOB_WALLTIME = "10:00:00"
 ABUNDANT_SAM_FILES = ('abundant_hits_read1.sam', 'abundant_hits_read2.sam')
 ABUNDANT_BAM_FILE = 'abundant_hits.bam'
 SORTED_ABUNDANT_BAM_FILE = 'abundant_hits.srt.bam'
-ABUNDANT_MAPPING_JOB_MEM = 2000
+ABUNDANT_MAPPING_JOB_MEM = 3750#2000
 ABUNDANT_MAPPING_JOB_WALLTIME = "20:00:00"
-ABUNDANT_FILTER_JOB_MEM = 1000
+ABUNDANT_FILTER_JOB_MEM = 3750#1000
 ABUNDANT_FILTER_JOB_WALLTIME = "10:00:00"
 ABUNDANT_BAMSORT_JOB_MEM = 8192
 ABUNDANT_BAMSORT_JOB_WALLTIME = "10:00:00"
@@ -67,7 +68,7 @@ XENO_BAM_FILE = 'xeno_hits.bam'
 SORTED_XENO_BAM_FILE = 'xeno_hits.srt.bam'
 XENO_MAPPING_JOB_MEM = 3750
 XENO_MAPPING_JOB_WALLTIME = "20:00:00"
-XENO_FILTER_JOB_MEM = 1000
+XENO_FILTER_JOB_MEM = 3750
 XENO_FILTER_JOB_WALLTIME = "10:00:00"
 XENO_BAMSORT_JOB_MEM = 8192
 XENO_BAMSORT_JOB_WALLTIME = "10:00:00"
@@ -114,7 +115,7 @@ BIGWIG_JOB_WALLTIME = "20:00:00"
 
 # merged alignment results
 MERGED_FRAG_SIZE_DIST_FILE = "merged_frag_size_dist.txt"
-MERGE_FRAG_SIZE_JOB_MEM = 1000
+MERGE_FRAG_SIZE_JOB_MEM = 3750#1000
 MERGE_FRAG_SIZE_JOB_WALLTIME = "1:00:00"
 MERGED_BAM_FILE = "merged_alignments.bam"
 MERGED_CLEAN_BAM_FILE = "merged_alignments_srdup.bam"
@@ -127,7 +128,7 @@ CLEAN_BAM_JOB_WALLTIME = "60:00:00"
 SAMTOOLS_VARIANT_BCF_FILE = "samtools.var.raw.bcf"
 SAMTOOLS_VARIANT_VCF_FILE = "samtools.var.flt.vcf"
 SAMTOOLS_VARIANT_JOB_MEM = 12000
-SAMTOOLS_VARIANT_JOB_WALLTIME = "72:00:00"
+SAMTOOLS_VARIANT_JOB_WALLTIME = "60:00:00"#"96:00:00"
 VARSCAN_VARIANT_SNV_FILE = "varscan.snvs.flt.txt"
 VARSCAN_VARIANT_IND_FILE = "varscan.indels.txt"
 VARSCAN_VARIANT_JOB_MEM = 12000
@@ -150,32 +151,39 @@ COSMIC_COVERAGE_JOB_MEM=3750
 COSMIC_COVERAGE_JOB_WALLTIME="24:00:00"
 CAPTURE_COVERAGE_JOB_MEM=3750
 CAPTURE_COVERAGE_JOB_WALLTIME="24:00:00"
-EXOME_CNV_JOB_MEM=3750
+EXOME_CNV_JOB_MEM=8192
 EXOME_CNV_JOB_WALLTIME="24:00:00"
 TUMOR_COSMIC_VCF = "tumor_cosmic_positions.vcf"
 COSMIC_QUAL_VCF = "cov_cosmic_positions.vcf"
 
 # cufflinks output
 CUFFLINKS_DIR = "cufflinks"
+CUFFLINKS_DIR_ASSEMBLY="cufflinks_assembly"
 CUFFLINKS_TRANSCRIPTS_GTF_FILE = os.path.join(CUFFLINKS_DIR, "transcripts.gtf")
 CUFFLINKS_GENES_FILE = os.path.join(CUFFLINKS_DIR, "genes.fpkm_tracking")
 CUFFLINKS_ISOFORMS_FILE = os.path.join(CUFFLINKS_DIR, "isoforms.fpkm_tracking")
+
+CUFFLINKS_AY_TRANSCRIPTS_GTF_FILE = os.path.join(CUFFLINKS_DIR_ASSEMBLY, "transcripts.gtf")
+CUFFLINKS_AY_GENES_FILE = os.path.join(CUFFLINKS_DIR_ASSEMBLY, "genes.fpkm_tracking")
+CUFFLINKS_AY_ISOFORMS_FILE = os.path.join(CUFFLINKS_DIR_ASSEMBLY, "isoforms.fpkm_tracking")
+
 CUFFLINKS_JOB_MEM = 24000
 CUFFLINKS_JOB_WALLTIME = "60:00:00"
 
 # notify complete
-NOTIFY_COMPLETE_JOB_MEM = 500
+NOTIFY_COMPLETE_JOB_MEM = 3750#500
 NOTIFY_COMPLETE_JOB_WALLTIME = "1:00:00"
 
 # cleanup intermediate files
-CLEANUP_INTERMEDIATE_FILES_JOB_MEM = 500
+CLEANUP_INTERMEDIATE_FILES_JOB_MEM = 3750#500
 CLEANUP_INTERMEDIATE_FILES_JOB_WALLTIME = "1:00:00"
 
 # cnv results
 CNV_FILE = "exome.cnvs.txt"
 LOH_FILE = "exome_loh.txt"
 CNV_PLOT = "exome_cnv_plot"
-
+CNV_R_BACKUP="exome_cnv_R_backup"
+DEFAULT_TUMOR_CONTENT=0.5
 # files for exome analysis
 # alignment results
 ALIGNED_READS_SAM = "aligned_reads.sam"
@@ -249,7 +257,7 @@ def attach_exome_sample_to_results(sample, root_dir):
     sample.probe_coverage_file = os.path.join(sample.output_dir, PROBE_COVERAGE)
     sample.probe_summary_file = os.path.join(sample.output_dir, PROBE_COVERAGE_SUMMARY)
     sample.coverage_bedgraph_file = os.path.join(sample.output_dir, COVERAGE_BEDGRAPH_FILE)
-    sample.coverage_bigwig_file = os.path.join(sample.output_dir, COVERAGE_BIGWIG_FILE)      
+    sample.coverage_bigwig_file = os.path.join(sample.output_dir, COVERAGE_BIGWIG_FILE)
     # attach libraries to results
     for library in sample.libraries:
         attach_exome_library_to_results(library, sample.output_dir)
@@ -272,6 +280,12 @@ def attach_rnaseq_library_to_results(library, root_dir):
     library.cufflinks_gtf_file = os.path.join(library.output_dir, CUFFLINKS_TRANSCRIPTS_GTF_FILE)
     library.cufflinks_genes_fpkm_file = os.path.join(library.output_dir, CUFFLINKS_GENES_FILE)
     library.cufflinks_isoforms_fpkm_file = os.path.join(library.output_dir, CUFFLINKS_ISOFORMS_FILE)  
+
+    library.cufflinks_ay_dir = os.path.join(library.output_dir, CUFFLINKS_DIR_ASSEMBLY)
+    library.cufflinks_ay_gtf_file = os.path.join(library.output_dir, CUFFLINKS_AY_TRANSCRIPTS_GTF_FILE)
+    library.cufflinks_ay_genes_fpkm_file = os.path.join(library.output_dir, CUFFLINKS_AY_GENES_FILE)
+    library.cufflinks_ay_isoforms_fpkm_file = os.path.join(library.output_dir, CUFFLINKS_AY_ISOFORMS_FILE)  
+        
     # lane results
     for lane in library.lanes:
         lane.output_dir = os.path.join(library.output_dir, lane.id)
@@ -359,6 +373,7 @@ def attach_sample_group_to_results(grp, root_dir):
     grp.exome_cnv_file = os.path.join(grp.output_dir, CNV_FILE)
     grp.exome_loh_file = os.path.join(grp.output_dir, LOH_FILE)
     grp.exome_cnv_plot = os.path.join(grp.output_dir, CNV_PLOT)
+    grp.exome_cnv_rbackup = os.path.join(grp.output_dir,CNV_R_BACKUP)
     # attach samples to results
     for sample_type, sample in grp.samples.iteritems():
         if sample is None:
@@ -496,10 +511,15 @@ class ServerConfig(object):
         c.name = elem.get("name")
         c.address = elem.get("address", None)
         c.ssh_port = int(elem.get("ssh_port", "22"))
+        if c.name=="flux":
+            c.xfer_addres=elem.findtext("server_xfer")
+        else:
+            c.xfer_addres=c.address
         c.modules_init_script = elem.findtext("modules_init_script")
         c.output_dir = elem.findtext("output_dir")
         c.tmp_dir = elem.findtext("tmp_dir")
         c.seq_repo_mirror_dir = elem.findtext("seq_repo_mirror_dir", None)
+        c.job_seq_repo_mirror_dir = elem.findtext("job_seq_repo_mirror_dir",None)
         c.references_dir = elem.findtext("references_dir")
         c.node_mem = float(elem.findtext("node_mem"))
         c.node_processors = int(elem.findtext("node_processors"))
@@ -700,6 +720,13 @@ class PipelineConfig(object):
         elem = root.find("cufflinks")
         for arg_elem in elem.findall("arg"):
             c.cufflinks_args.append(arg_elem.text)
+        print c.cufflinks_args
+        
+        c.cufflinks_ay_args=[]
+        elem = root.find("cufflinks_assembly")        
+        if elem is not None:
+            for arg_elem in elem.findall("arg"):
+                c.cufflinks_ay_args.append(arg_elem.text)
         # TODO: chimerascan has now been deprecated, remove this
         # chimerascan parameters
         # c.chimerascan_config = ChimerascanConfig.from_xml_elem(root.find("chimerascan"))
