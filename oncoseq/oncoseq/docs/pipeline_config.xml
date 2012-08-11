@@ -1,19 +1,21 @@
 <oncoseq>
   <!-- server setup -->
   <server name="flux" address="flux-login.engin.umich.edu" ssh_port="22">
-    <modules_init_script>/scratch/arul_flux/med-mctp/sw/rhel5/init.sh</modules_init_script>
+    <server_xfer>flux-xfer.engin.umich.edu</server_xfer>
+    <modules_init_script>/scratch/arul_flux/med-mctp/sw/rhel6/init.sh</modules_init_script>
     <output_dir>/scratch/arul_flux/med-mctp/projects/oncoseq/runs</output_dir>
     <tmp_dir>/scratch/arul_flux/med-mctp/projects/oncoseq/tmp</tmp_dir>
     <references_dir>/scratch/arul_flux/med-mctp/projects/oncoseq/references</references_dir>
     <seq_repo_mirror_dir>/scratch/arul_flux/med-mctp/seq</seq_repo_mirror_dir>
+    <job_seq_repo_mirror_dir>/scratch/arul_flux/med-mctp/projects/oncoseq/tmp/seq</job_seq_repo_mirror_dir>
     <node_mem>45000</node_mem>
     <node_processors>12</node_processors>
     <pbs>yes</pbs>
     <max_user_jobs>3000</max_user_jobs>
-    <script_line>#PBS -l qos=arul_flux</script_line>
     <script_line>#PBS -A arul_flux</script_line>
+    <script_line>#PBS -l qos=flux</script_line>
     <script_line>#PBS -q flux</script_line>
-    <script_line>#PBS -V</script_line>
+    <script_line>#PBS -V </script_line>
     <script_line>#PBS -M mctp-flux-pl@umich.edu</script_line>
   </server>
   <server name="mkiyer_rhel6" address="None" ssh_port="22">
@@ -53,6 +55,45 @@
     <references_dir>/exds/projects/oncoseq/references</references_dir>
     <node_mem>256000</node_mem>
     <node_processors>48</node_processors>
+    <pbs>no</pbs>
+  </server>
+  <server name="local_rhel5" address="None" ssh_port="22">
+    <modules_init_script>/exds/sw/rhel5/init.sh</modules_init_script>
+    <output_dir>/exds/projects/oncoseq/runs/test</output_dir>
+    <tmp_dir>/exds/projects/oncoseq/tmp</tmp_dir>
+    <references_dir>/exds/projects/oncoseq/references</references_dir>
+    <node_mem>8000</node_mem>
+    <node_processors>4</node_processors>
+    <pbs>no</pbs>
+  </server>
+  <server name="exds_lx4" address="None" ssh_port="22">
+    <modules_init_script>/exds/sw/rhel5/init.sh</modules_init_script>
+    <output_dir>/exds/projects/oncoseq/runs/mioncoseq</output_dir>
+    <tmp_dir>/exds/projects/oncoseq/tmp</tmp_dir>
+    <references_dir>/exds/projects/oncoseq/references</references_dir>
+    <node_mem>100000</node_mem>
+    <node_processors>48</node_processors>
+    <pbs>no</pbs>
+  </server>
+  <server name="mctp_pbs" address="mctp-hpc-login1" ssh_port="22">
+    <modules_init_script>/exds/sw/rhel6/init.sh</modules_init_script>
+    <output_dir>/exds/projects/oncoseq/runs/mioncoseq</output_dir>
+    <tmp_dir>/exds/projects/oncoseq/tmp</tmp_dir>
+    <references_dir>/exds/projects/oncoseq/references</references_dir>
+    <node_mem>132000</node_mem>
+    <node_processors>32</node_processors>
+    <pbs>yes</pbs>
+    <max_user_jobs>1000</max_user_jobs>
+    <script_line>#PBS -V</script_line>
+    <script_line>#PBS -M mctp-flux-pl@umich.edu</script_line>
+  </server>
+  <server name="mctp_pbs_local" address="mctp-hpc-login1" ssh_port="22">
+    <modules_init_script>/exds/sw/rhel6/init.sh</modules_init_script>
+    <output_dir>/exds/projects/oncoseq/runs/mioncoseq</output_dir>
+    <tmp_dir>/exds/projects/oncoseq/tmp</tmp_dir>
+    <references_dir>/exds/projects/oncoseq/references</references_dir>
+    <node_mem>132000</node_mem>
+    <node_processors>32</node_processors>
     <pbs>no</pbs>
   </server>
 
@@ -136,7 +177,7 @@
     <picard_ribosomal_intervals>Annotation/Genes/picard_ribosomal_intervals.txt</picard_ribosomal_intervals>
     <cosmic_positions>Annotation/Exome/CosmicMutations_AtInformativeGenes_cosmic_v56_151111.3.bed</cosmic_positions>
     <capture_roche>Annotation/Exome/Roche_probes_coords_EZExome2_Tiled.bed</capture_roche>
-    <capture_agilent>Annotation/Exome/SureSelect_probes_coords_50MbKit.bed</capture_agilent>
+    <capture_agilent>Annotation/Exome/SureSelect_probes_coords_50MbKit.GRCh37.bed</capture_agilent>
     <exome_bed_file>Annotation/Exome/CCDSGene.B37.bed</exome_bed_file>
   </species>
 
