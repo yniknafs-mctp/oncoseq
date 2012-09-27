@@ -79,6 +79,9 @@ FRAG_SIZE_DIST_PLOT_FILE = "frag_size_dist_plot.pdf"
 FRAG_SIZE_JOB_MEM = 3750
 FRAG_SIZE_JOB_WALLTIME = "10:00:00"
 
+# Exome kits
+EXOME_KITS={'AGILENT':"capture_agilent", 'ROCHE':"capture_roche", 'TRUSEQ':"capture_truseq"}
+
 # TODO: remove chimerascan from pipeline
 # TODO: 09-10-2012. Comment back all chimerascan lines of code after introducing the most up to date version
 # or if it is decided that chimerascan should be removed
@@ -471,6 +474,7 @@ class GenomeConfig(object):
                   "cosmic_positions",
                   "capture_roche",
                   "capture_agilent",
+                  "capture_TruSeq"
                   "exome_bed_file")
     
     @staticmethod
@@ -755,6 +759,12 @@ class PipelineConfig(object):
         for elem in root.findall("server"):
             server = ServerConfig.from_xml_elem(elem)
             c.servers[server.name] = server
+        
+        ###########
+        ##Parameters for the EXOME pipeline
+        elem = root.findtext("exome_kit")
+        if elem is not None:
+            c.exome_kit = elem
         # bwa parameters 
         c.bwa_config = BWAConfig.from_xml_elem(root.find("bwa"))
         # varscan parameters

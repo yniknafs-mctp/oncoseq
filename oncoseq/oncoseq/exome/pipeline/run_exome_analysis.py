@@ -598,9 +598,10 @@ def run_sample(sample, genome, server, pipeline, num_processors,
         logging.info("[SKIPPED] %s" % msg)
     else:
         logging.info(msg)
+        caputure_kit=config.EXOME_KITS[pipeline.exome_kit]
         args = [sys.executable, os.path.join(_exome_pipeline_dir, "target_coverage.py"),
                 sample.merged_cleaned_bam_efile,
-                os.path.join(server.references_dir, genome.get_path("capture_agilent")),# "capture_agilent"
+                os.path.join(server.references_dir, genome.get_path(caputure_kit)),# "capture_agilent"
                 sample.probe_coverage_file,
                 sample.probe_summary_file,
                 pipeline.vscan_config.min_avgbase_quality]

@@ -167,6 +167,9 @@
     <mapping_qual>10</mapping_qual>
   </bwa>
 
+  <!--EXOME KIT should be one of AGILENT, ROCHE, TRUSEQ -->
+  <exome_kit>AGILENT</exome_kit>
+
   <!--Varscan Parameters -->
   <varscan>
     <min_coverage>1</min_coverage>
@@ -175,7 +178,8 @@
     <min_var_freq>0.01</min_var_freq>
     <min_pvalue>0.01</min_pvalue>
   </varscan>
-  
+   
+  <!-- EXOME_KITS={'AGILENT':"capture_agilent", 'ROCHE':"capture_roche", 'TRUSEQ':"capture_truseq"}-->
   <!-- species specific file locations -->
   <species name="human">
     <root_dir>Homo_sapiens_Ensembl_GRCh37</root_dir>
