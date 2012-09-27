@@ -3,7 +3,7 @@
   <server name="flux" address="flux-login.engin.umich.edu" ssh_port="22">
     <server_xfer>flux-xfer.engin.umich.edu</server_xfer>
     <modules_init_script>/scratch/arul_flux/med-mctp/sw/rhel6/init.sh</modules_init_script>
-    <output_dir>/scratch/arul_flux/med-mctp/projects/oncoseq/runs</output_dir>
+    <output_dir>/scratch/arul_flux/med-mctp/projects/oncoseq</output_dir>
     <tmp_dir>/scratch/arul_flux/med-mctp/projects/oncoseq/tmp</tmp_dir>
     <references_dir>/scratch/arul_flux/med-mctp/projects/oncoseq/references</references_dir>
     <seq_repo_mirror_dir>/scratch/arul_flux/med-mctp/seq</seq_repo_mirror_dir>
@@ -15,7 +15,7 @@
     <script_line>#PBS -A arul_flux</script_line>
     <script_line>#PBS -l qos=flux</script_line>
     <script_line>#PBS -q flux</script_line>
-    <script_line>#PBS -V </script_line>
+    <script_line>#PBS -V</script_line>
     <script_line>#PBS -M mctp-flux-pl@umich.edu</script_line>
   </server>
   <server name="mkiyer_rhel6" address="None" ssh_port="22">
@@ -77,19 +77,22 @@
   </server>
   <server name="mctp_pbs" address="mctp-hpc-login1" ssh_port="22">
     <modules_init_script>/exds/sw/rhel6/init.sh</modules_init_script>
-    <output_dir>/exds/projects/oncoseq/runs/mioncoseq</output_dir>
+    <output_dir>/exds/projects/oncoseq/runs</output_dir>
+    <seq_repo_mirror_dir>/exds/solexa/seq</seq_repo_mirror_dir>
+    <job_seq_repo_mirror_dir>/exds/projects/oncoseq/tmp/seq</job_seq_repo_mirror_dir>
     <tmp_dir>/exds/projects/oncoseq/tmp</tmp_dir>
     <references_dir>/exds/projects/oncoseq/references</references_dir>
     <node_mem>132000</node_mem>
     <node_processors>32</node_processors>
     <pbs>yes</pbs>
     <max_user_jobs>1000</max_user_jobs>
+    <script_line>#PBS -q batch</script_line>
     <script_line>#PBS -V</script_line>
-    <script_line>#PBS -M mctp-flux-pl@umich.edu</script_line>
+    <script_line>#PBS -M oabalbin@med.umich.edu</script_line>
   </server>
   <server name="mctp_pbs_local" address="mctp-hpc-login1" ssh_port="22">
     <modules_init_script>/exds/sw/rhel6/init.sh</modules_init_script>
-    <output_dir>/exds/projects/oncoseq/runs/mioncoseq</output_dir>
+    <output_dir>/exds/projects/oncoseq/runs</output_dir>
     <tmp_dir>/exds/projects/oncoseq/tmp</tmp_dir>
     <references_dir>/exds/projects/oncoseq/references</references_dir>
     <node_mem>132000</node_mem>
@@ -117,7 +120,9 @@
     <module>ucsc/2012-Feb-08</module>
     <module>varscan/2.2.8</module>
     <module>bwa/0.6.1</module>
+    <module>chimerascan/0.4.5</module>
   </modules>
+
 
   <!-- RNA pipeline -->
   <!-- fragment size parameters -->
@@ -143,6 +148,16 @@
     <arg>-q</arg>
   </cufflinks>
 
+  <!-- chimerascan parameters -->
+  <chimerascan>
+	<index>${SPECIES}/Sequence/ChimerascanIndex</index>
+	<trim5>1</trim5>
+    <trim3>1</trim3>
+    <frag_size_percentile>1.0</frag_size_percentile>
+    <arg>-v</arg>
+    <arg>--keep-tmp</arg>
+  </chimerascan>
+
   <!--Exome Pipeline Parameters -->
   <!--BWA Parameters -->
   <bwa>
@@ -166,7 +181,7 @@
     <root_dir>Homo_sapiens_Ensembl_GRCh37</root_dir>
 	<!-- sequences and alignment indexes -->
     <abundant_index>Sequence/AbundantSequences/abundant</abundant_index>
-    <foreign_index>Sequence/ForeignSequences/foreign</foreign_index>
+    <foreign_index>Sequence/ForeignSequences/foreign3</foreign_index>
     <genome_fasta_file>Sequence/Genome/genome_lexicographical_order.fa</genome_fasta_file>
     <genome_bwa_index>Sequence/Genome/BWAIndex_v0.6.1/genome.fa</genome_bwa_index>
     <genome_bowtie2_index>Sequence/Genome/Bowtie2Index/genome</genome_bowtie2_index>

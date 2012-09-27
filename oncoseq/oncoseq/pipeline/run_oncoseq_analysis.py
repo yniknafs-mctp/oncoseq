@@ -118,6 +118,7 @@ def run_patient(patient, server, pipeline, num_processors,
                                  email="ae",
                                  deps=grp_deps)
         deps = [job_id]
+    
     return deps
 
 def run_analysis(analysis_file, config_file, server_name,

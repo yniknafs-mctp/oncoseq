@@ -55,11 +55,32 @@ def main():
                 for f in lane.xeno_sam_files:
                     if os.path.exists(f):
                         os.remove(f)
+                #TODO: 09-13-2012 while the following picard issue is solved
+                '''
+                Exception in thread "main" java.lang.IllegalArgumentException: Cannot add sequence that already exists in 
+                SAMSequenceDictionary: gi|225862057|ref|NC_012472.1|
+                '''
+                '''
                 if os.path.exists(lane.xeno_bam_file):
                     os.remove(lane.xeno_bam_file)                
+                '''
                 # remove coverage bedgraph file
                 if os.path.exists(lane.coverage_bedgraph_file):
                     os.remove(lane.coverage_bedgraph_file)
+                # TODO: 09-11-2012: remove this is you take out chimerascan from the pipeline. 
+                # remove chimerascan intermediate alignment files
+                if os.path.exists(lane.chimerascan_aligned_reads):
+                    os.remove(lane.chimerascan_aligned_reads)
+                if os.path.exists(lane.chimerascan_sorted_reads):
+                    os.remove(lane.chimerascan_sorted_reads)
+                if os.path.exists(lane.chimerascan_index_reads):
+                    os.remove(lane.chimerascan_index_reads)
+                if os.path.exists(lane.chimerascan_reads1):
+                    os.remove(lane.chimerascan_reads1)
+                if os.path.exists(lane.chimerascan_reads2):
+                    os.remove(lane.chimerascan_reads2)
+
+                
     return result
     
 if __name__ == '__main__':

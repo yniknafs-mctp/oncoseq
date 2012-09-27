@@ -130,7 +130,7 @@ def copy_to_remote(src, dst, remote_address, username, port, maxsize=(8<<30), tm
         # reconstitute original file from split
         logging.debug("Concatenating chunks")
         command = "cd %s; cat %s* > %s; rm %s*" % (dst_dir, src_prefix, dst, src_prefix)
-        retcode = ssh_exec(remote_address, command, port)
+        retcode = ssh_exec(login_remote_address, command, port)
         # remove local split files
         shutil.rmtree(split_dir)
     else:

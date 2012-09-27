@@ -304,6 +304,58 @@ def run_lane(lane, genome, server, pipeline, num_processors,
                                  deps=filtered_fastq_deps,
                                  stderr_filename=log_file)
         frag_size_deps = [job_id]
+    
+    #
+    # NOTE 09-10-2012: This Chimerascan code is depecrated (april 2012) and it should be updated with the
+    # most up to date version of this software. It is only used here for consistency with previous runs.
+    #
+    #
+    # run chimerascan gene fusion discovery tool
+    #
+    chimerascan_deps = []
+    if len(lane.filtered_fastq_files) > 1:
+        msg = "Finding gene fusions with chimerascan"
+        if (up_to_date(lane.chimerascan_results_file, lane.frag_size_dist_file) and
+            all(up_to_date(lane.chimerascan_results_file, f) for f in lane.filtered_fastq_files)):
+            logging.info("[SKIPPED] %s" % (msg))
+        else:
+            logging.info("%s" % (msg))
+            args = [sys.executable, os.path.join(_rnaseq_pipeline_dir, "run_chimerascan.py"),
+                    "-p", num_processors,
+                    "--library-type", config.get_tophat_library_type(lane.library.strand_protocol),
+                    "--trim5", pipeline.chimerascan_config.trim5,
+                    "--trim3", pipeline.chimerascan_config.trim3,
+                    "--frag-size-percentile", pipeline.chimerascan_config.frag_size_percentile]
+            for arg in pipeline.chimerascan_config.args:
+                # substitute species-specific root directory
+                species_arg = arg.replace("${SPECIES}", os.path.join(server.references_dir, genome.root_dir)) 
+                args.append('--arg="%s"' % species_arg)
+            # substitute species-specific index    
+            index = pipeline.chimerascan_config.index
+            species_index = index.replace("${SPECIES}", os.path.join(server.references_dir, genome.root_dir)) 
+            args.extend([lane.chimerascan_dir,
+                         species_index,
+                         lane.frag_size_dist_file])
+            args.extend(lane.filtered_fastq_files)
+            logging.debug("\targs: %s" % (' '.join(map(str, args))))
+            log_file = os.path.join(log_dir, "chimerascan.log")
+            # TODO: allocate 11.25gb per processor to run?!?
+            chimerascan_processors = min(4, server.node_processors, num_processors)
+            chimerascan_mem = 11250
+            job_id = submit_job_func("chimera_%s" % (lane.id), args,
+                                     num_processors=chimerascan_processors,
+                                     node_processors=server.node_processors,
+                                     node_memory=server.node_mem,
+                                     pbs_script_lines=server.pbs_script_lines,
+                                     working_dir=lane.output_dir,
+                                     pmem=chimerascan_mem,
+                                     walltime="60:00:00",
+                                     deps=frag_size_deps,
+                                     stderr_filename=log_file)
+            chimerascan_deps = [job_id]
+    else:
+        logging.info("[SKIPPED] Cannot run chimerascan on single-end libraries")
+    
     #
     # align reads with tophat
     #
@@ -419,6 +471,12 @@ def run_lane(lane, genome, server, pipeline, num_processors,
         args = [os.path.join(pipeline.bedtools_dir, "genomeCoverageBed"),
                 "-bg", "-split", "-g", (os.path.join(server.references_dir, genome.get_path("chrom_sizes"))),
                 "-ibam", lane.tophat_bam_file]
+        
+        # TODO: 09-11-2012
+        # Need to write to calls to the genoCoverageBed (one for each strand) and then two for the bigwig file
+        # First you need to evaluate whether or not is useful and the information is depicted correctly.
+        #args.append(config.get_genomeCoverageBed_strand(lane.library.strand_protocol))
+                
         log_file = os.path.join(log_dir, "genomeCoverageBed.log")
         logging.debug("\targs: %s" % (' '.join(map(str, args))))
         job_id = submit_job_func("bedtools_%s" % (lane.id), args,
@@ -433,6 +491,27 @@ def run_lane(lane, genome, server, pipeline, num_processors,
                                  stdout_filename=lane.coverage_bedgraph_file,
                                  stderr_filename=log_file)
         bedgraph_deps = [job_id]
+
+        # TODO: 09-11-2012
+        # This is just temporary to ensure that bedGraph was created
+        # Some times the bigWug process starts before the process the writting finishes.
+        msg="Checking that the genomeCoverageBed was created in the correct location"
+        logging.info(msg)
+        args = ['ls' ,'-lrth',lane.coverage_bedgraph_file]
+                        
+        log_file = os.path.join(log_dir, "genomeCoverageBed_test.log")
+        logging.debug("\targs: %s" % (' '.join(map(str, args))))
+        job_id = submit_job_func("check_genCov_%s" % (lane.id), args,
+                                 num_processors=1,
+                                 node_processors=server.node_processors,
+                                 node_memory=server.node_mem,
+                                 pbs_script_lines=server.pbs_script_lines,
+                                 working_dir=lane.output_dir,
+                                 mem=config.NOTIFY_COMPLETE_JOB_MEM,
+                                 walltime=config.NOTIFY_COMPLETE_JOB_WALLTIME,
+                                 deps=bedgraph_deps,
+                                 stderr_filename=log_file)
+        bedgraph_deps.append(job_id)    
     #
     # convert bedgraph to bigwig coverage file
     #
@@ -680,7 +759,55 @@ def run_library(library, genome, server, pipeline, num_processors,
                                  deps=merge_bam_deps + merge_frag_size_deps,
                                  stderr_filename=log_file)
         cufflinks_deps = [job_id]
+
     lib_deps = cufflinks_deps + samtools_snv_deps + varscan_deps
+    
+    #
+    # run cufflinks in assembly mode to estimate transcript abundance of annotated and un-annotated genes
+    #
+    '''
+    library.cufflinks_ay_gtf_file = os.path.join(library.cufflinks_ay_dir, "transcripts.gtf")    
+    cufflinks_ay_deps = []
+    msg = "Reconstructing transcripts and estimating transcript abundances with Cufflinks"
+    if (up_to_date(library.cufflinks_ay_gtf_file, library.merged_bam_file) and
+        up_to_date(library.cufflinks_ay_gtf_file, library.merged_frag_size_dist_file)):
+        logging.info("[SKIPPED] %s" % msg)
+    else:
+        logging.info(msg)
+        if not os.path.exists(library.cufflinks_ay_dir):
+            logging.info("\tcreating directory: %s" % (library.cufflinks_ay_dir))
+            os.makedirs(library.cufflinks_ay_dir)
+        args = [sys.executable, os.path.join(_rnaseq_pipeline_dir, "run_cufflinks.py"),
+                "--cufflinks-bin", pipeline.cufflinks_bin,
+                "-p", num_processors,
+                "-L", library.id,
+                "--library-type", config.get_tophat_library_type(library.strand_protocol)]
+        if has_paired_end:
+            args.append("--learn-frag-size")
+        for arg in pipeline.cufflinks_ay_args:
+            # substitute species-specific root directory
+            species_arg = arg.replace("${SPECIES}", os.path.join(server.references_dir, genome.root_dir)),
+            args.append('--cufflinks-arg="%s"' % (species_arg))
+        args.extend([library.merged_bam_file,
+                     library.cufflinks_ay_dir,
+                     library.merged_frag_size_dist_file])
+        log_file = os.path.join(log_dir, "cufflinks.ay.log")
+        logging.debug("\targs: %s" % (' '.join(map(str, args))))
+        job_id = submit_job_func("cuff_%s" % (library.id), args,
+                                 num_processors=num_processors,
+                                 node_processors=server.node_processors,
+                                 node_memory=server.node_mem,
+                                 pbs_script_lines=server.pbs_script_lines,
+                                 working_dir=library.cufflinks_ay_dir,
+                                 mem=config.CUFFLINKS_JOB_MEM,
+                                 walltime=config.CUFFLINKS_JOB_WALLTIME,
+                                 deps=merge_bam_deps + merge_frag_size_deps,
+                                 stderr_filename=log_file)
+        cufflinks_ay_deps = [job_id]
+
+    lib_deps = cufflinks_deps + cufflinks_ay_deps + samtools_snv_deps + varscan_deps
+    '''
+
 
     return lib_deps + all_lane_deps
 
@@ -707,6 +834,7 @@ def run_sample(sample, genome, server, pipeline, num_processors,
     # write file indicating job is complete
     #
     deps = lib_deps
+    print lib_deps
     msg = "Notifying user that job is complete"
     if os.path.exists(sample.job_complete_file) and (len(lib_deps) == 0):
         logging.info("[SKIPPED]: %s" % msg)
@@ -747,6 +875,7 @@ def run_sample_group(grp, genome, server, pipeline, num_processors,
             logging.info(msg)
             args = [sys.executable, os.path.join(_rnaseq_pipeline_dir, "cleanup_intermediate_files.py")]
             args.extend([os.path.abspath(sample.xml_file), grp.output_dir, sample.id])
+            log_file = os.path.join(grp.output_dir, "remove_intermediate_files.log")
             job_id = submit_job_func("rm_%s" % (sample.id), args,
                                      num_processors=1,
                                      node_processors=server.node_processors,
@@ -755,14 +884,15 @@ def run_sample_group(grp, genome, server, pipeline, num_processors,
                                      working_dir=sample.output_dir,
                                      mem=config.CLEANUP_INTERMEDIATE_FILES_JOB_MEM,
                                      walltime=config.CLEANUP_INTERMEDIATE_FILES_JOB_WALLTIME,
-                                     deps=deps)
+                                     deps=deps,
+                                     stderr_filename=log_file)
             sample_deps.append(job_id)
     #
     # write file indicating job is complete
     #
     deps = sample_deps
     msg = "Notifying user that job is complete"
-    if os.path.exists(grp.rna_job_complete_file) and (len(sample_deps) == 0):
+    if (os.path.exists(grp.rna_job_complete_file) or (len(sample_deps) == 0)):
         logging.info("[SKIPPED]: %s" % msg)
     else:
         logging.info(msg)

@@ -55,7 +55,9 @@ def validate_lane_results(lane):
     #    logging.error("Lane %s missing/corrupt chimerascan results file" % (lane.id))
     #    is_valid = False
     # check sorted foreign sequence bam file
-    if not check_sam_file(lane.sorted_xeno_bam_file, isbam=True):
+    #if not check_sam_file(lane.sorted_xeno_bam_file, isbam=True):
+    # TODO: 09-13-2012 tmp.
+    if not check_sam_file(lane.xeno_bam_file, isbam=True):
         logging.error("Lane %s missing/corrupt foreign sequences BAM file" % (lane.id))
         is_valid = False
     # check fragment size distribution

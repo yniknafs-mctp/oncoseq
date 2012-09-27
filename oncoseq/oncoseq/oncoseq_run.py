@@ -152,6 +152,7 @@ def run_remote(analysis_file, config_file, server_name, num_processors,
                             # replace fastq fields in XML file
                             logging.info("Copying lane %s fastq file" % (lane.id))
                             ext = os.path.splitext(local_file)[-1]
+                            print server.job_seq_repo_mirror_dir,lane.id, readnum+1, ext
                             remote_file = os.path.join(server.job_seq_repo_mirror_dir, "%s_%d%s" % (lane.id, readnum+1, ext)) #job_output_dir
                             print server.address
                             retcode = copy_to_remote(local_file, remote_file, 

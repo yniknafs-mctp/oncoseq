@@ -813,7 +813,7 @@ def run_sample_group(grp, genome, server, pipeline, num_processors,
     #
     deps = grp_deps
     msg = "Notifying user that sample group jobs are complete"
-    if os.path.exists(grp.dna_job_complete_file) and (len(grp_deps) == 0):
+    if (os.path.exists(grp.dna_job_complete_file) or (len(grp_deps) == 0)):
         logging.info("[SKIPPED]: %s" % msg)
     else:
         logging.info(msg)

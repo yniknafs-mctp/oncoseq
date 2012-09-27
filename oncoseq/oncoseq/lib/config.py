@@ -43,8 +43,8 @@ COPY_UNCOMPRESS_JOB_WALLTIME = "10:00:00"
 FASTQC_DIR_EXTENSION = "_fastqc"
 FASTQC_DATA_FILE = "fastqc_data.txt"
 FASTQC_REPORT_FILE = "fastqc_report.html"
-FASTQC_JOB_MEM = 2000
-FASTQC_JOB_WALLTIME = "10:00:00"
+FASTQC_JOB_MEM = 7500#3750
+FASTQC_JOB_WALLTIME = "20:00:00"#"10:00:00"
 
 # abundant sequence mapping
 ABUNDANT_SAM_FILES = ('abundant_hits_read1.sam', 'abundant_hits_read2.sam')
@@ -80,10 +80,17 @@ FRAG_SIZE_JOB_MEM = 3750
 FRAG_SIZE_JOB_WALLTIME = "10:00:00"
 
 # TODO: remove chimerascan from pipeline
+# TODO: 09-10-2012. Comment back all chimerascan lines of code after introducing the most up to date version
+# or if it is decided that chimerascan should be removed
 # chimerascan gene fusion analysis
-#CHIMERASCAN_DIR = 'chimerascan'
-#CHIMERASCAN_RESULTS_FILE = 'chimeras.bedpe'
-#CHIMERASCAN_MIN_SEGMENT_LENGTH = 25
+CHIMERASCAN_DIR = 'chimerascan'
+CHIMERASCAN_RESULTS_FILE = 'chimeras.bedpe'
+CHIMERASCAN_MIN_SEGMENT_LENGTH = 25
+CHIMERASCAN_SORTED_READS="sorted_aligned_reads.bam"
+CHIMERASCAN_SORTED_INDEX="sorted_aligned_reads.bam.bai"
+CHIMERASCAN_ALIGNED_READS="aligned_reads.bam"
+CHIMERASCAN_READS1="reads_1.fq"
+CHIMERASCAN_READS2="reads_2.fq"
 
 # tophat alignment results
 TOPHAT_DIR = 'tophat'
@@ -128,11 +135,11 @@ CLEAN_BAM_JOB_WALLTIME = "60:00:00"
 SAMTOOLS_VARIANT_BCF_FILE = "samtools.var.raw.bcf"
 SAMTOOLS_VARIANT_VCF_FILE = "samtools.var.flt.vcf"
 SAMTOOLS_VARIANT_JOB_MEM = 12000
-SAMTOOLS_VARIANT_JOB_WALLTIME = "60:00:00"#"96:00:00"
+SAMTOOLS_VARIANT_JOB_WALLTIME = "90:00:00"#"96:00:00"
 VARSCAN_VARIANT_SNV_FILE = "varscan.snvs.flt.txt"
 VARSCAN_VARIANT_IND_FILE = "varscan.indels.txt"
 VARSCAN_VARIANT_JOB_MEM = 12000
-VARSCAN_VARIANT_JOB_WALLTIME = "60:00:00"
+VARSCAN_VARIANT_JOB_WALLTIME = "120:00:00"
 BWA_ALIGNMENT_JOB_MEM=3750
 BWA_ALIGNMENT_JOB_WALLTIME="24:00:00"
 BWA_MAPPING_JOB_MEM=8192
@@ -152,7 +159,7 @@ COSMIC_COVERAGE_JOB_WALLTIME="24:00:00"
 CAPTURE_COVERAGE_JOB_MEM=3750
 CAPTURE_COVERAGE_JOB_WALLTIME="24:00:00"
 EXOME_CNV_JOB_MEM=8192
-EXOME_CNV_JOB_WALLTIME="24:00:00"
+EXOME_CNV_JOB_WALLTIME="60:00:00"
 TUMOR_COSMIC_VCF = "tumor_cosmic_positions.vcf"
 COSMIC_QUAL_VCF = "cov_cosmic_positions.vcf"
 
@@ -215,6 +222,13 @@ def get_picard_strand_specificity(strand_protocol):
         return "SECOND_READ_TRANSCRIPTION_STRAND"
     else:
         return "NONE"
+'''
+def get_genomeCoverageBed_strand(strand_protocol):
+    if strand_protocol == "dutp":
+        return True
+    else:
+        return False
+''' 
 
 def attach_exome_library_to_results(library, root_dir):
     library.output_dir = os.path.join(root_dir, library.id)
@@ -316,8 +330,13 @@ def attach_rnaseq_library_to_results(library, root_dir):
             lane.filtered_fastq_files.append(os.path.join(lane.output_dir, FILTERED_FASTQ_FILES[readnum]))
         # TODO: remove chimerascan
         # chimerascan results
-        #lane.chimerascan_dir = os.path.join(lane.output_dir, CHIMERASCAN_DIR)
-        #lane.chimerascan_results_file = os.path.join(lane.chimerascan_dir, CHIMERASCAN_RESULTS_FILE)
+        lane.chimerascan_dir = os.path.join(lane.output_dir, CHIMERASCAN_DIR)
+        lane.chimerascan_results_file = os.path.join(lane.chimerascan_dir, CHIMERASCAN_RESULTS_FILE)
+        lane.chimerascan_aligned_reads=os.path.join(lane.chimerascan_dir, CHIMERASCAN_ALIGNED_READS)
+        lane.chimerascan_sorted_reads=os.path.join(lane.chimerascan_dir,CHIMERASCAN_SORTED_READS)
+        lane.chimerascan_index_reads=os.path.join(lane.chimerascan_dir,  CHIMERASCAN_SORTED_INDEX)
+        lane.chimerascan_reads1=os.path.join(os.path.join(lane.chimerascan_dir, "tmp"),CHIMERASCAN_READS1)
+        lane.chimerascan_reads2=os.path.join(os.path.join(lane.chimerascan_dir, "tmp"),CHIMERASCAN_READS2)
         # Sorted abundant reads bam file
         lane.sorted_abundant_bam_file = os.path.join(lane.output_dir, SORTED_ABUNDANT_BAM_FILE)
         # Contaminant foreign organism (xeno) SAM files
@@ -587,36 +606,37 @@ class ServerConfig(object):
             valid = False
         return valid    
 
-# TODO: remove chimerascan?
-#class ChimerascanConfig(object):
-#    @staticmethod
-#    def from_xml_elem(elem):
-#        c = ChimerascanConfig()
-#        for attrname in ("index", "trim5", "trim3", "frag_size_percentile"):
-#            setattr(c, attrname, elem.findtext(attrname))
-#        c.args = []
-#        for arg_elem in elem.findall("arg"):
-#            c.args.append(arg_elem.text)
-#        return c
-#    
-#    def to_xml(self, root):
-#        for attrname in ("index", "trim5", "trim3", "frag_size_percentile"):
-#            attrval = getattr(self,attrname)
-#            if attrval is not None:
-#                elem = etree.SubElement(root, attrname)
-#                elem.text = str(attrval)
-#        for arg in self.args:
-#            elem = etree.SubElement(root, "arg")
-#            elem.text = arg            
+# TODO: remove chimerascan? 
+# TODO: 09-10-2012 comment this back and all other chimerascan lines after updating with the new version of chimera scan.
+class ChimerascanConfig(object):
+    @staticmethod
+    def from_xml_elem(elem):
+        c = ChimerascanConfig()
+        for attrname in ("index", "trim5", "trim3", "frag_size_percentile"):
+            setattr(c, attrname, elem.findtext(attrname))
+        c.args = []
+        for arg_elem in elem.findall("arg"):
+            c.args.append(arg_elem.text)
+        return c
+    
+    def to_xml(self, root):
+        for attrname in ("index", "trim5", "trim3", "frag_size_percentile"):
+            attrval = getattr(self,attrname)
+            if attrval is not None:
+                elem = etree.SubElement(root, attrname)
+                elem.text = str(attrval)
+        for arg in self.args:
+            elem = etree.SubElement(root, "arg")
+            elem.text = arg            
 #
-#    def is_valid(self, species_dir):
-#        valid = True
-#        species_sub = lambda arg: arg.replace("${SPECIES}", species_dir)
-#        newindex = species_sub(self.index)
-#        if not os.path.exists(newindex):
-#            logging.error("File not found: %s" % (newindex))
-#            valid = False
-#        return valid
+    def is_valid(self, species_dir):
+        valid = True
+        species_sub = lambda arg: arg.replace("${SPECIES}", species_dir)
+        newindex = species_sub(self.index)
+        if not os.path.exists(newindex):
+            logging.error("File not found: %s" % (newindex))
+            valid = False
+        return valid
 
 class BWAConfig(object):
     __fields__ = ("bwa_cores", "nmismatch", "bwa_qual_trim", "mapping_qual")
@@ -729,7 +749,7 @@ class PipelineConfig(object):
                 c.cufflinks_ay_args.append(arg_elem.text)
         # TODO: chimerascan has now been deprecated, remove this
         # chimerascan parameters
-        # c.chimerascan_config = ChimerascanConfig.from_xml_elem(root.find("chimerascan"))
+        c.chimerascan_config = ChimerascanConfig.from_xml_elem(root.find("chimerascan"))
         # server setup
         c.servers = {}
         for elem in root.findall("server"):
@@ -773,8 +793,8 @@ class PipelineConfig(object):
             elem.text = arg
         # TODO: chimerascan has now been deprecated, remove this
         # chimerascan parameters
-        #chimerascan_elem = etree.SubElement(root, "chimerascan")
-        #self.chimerascan_config.to_xml(chimerascan_elem)
+        chimerascan_elem = etree.SubElement(root, "chimerascan")
+        self.chimerascan_config.to_xml(chimerascan_elem)
         # bwa parameters
         bwa_elem = etree.SubElement(root, "bwa")
         self.bwa_config.to_xml(bwa_elem)
@@ -816,11 +836,11 @@ class PipelineConfig(object):
                 valid = False
         # TODO: chimerascan has now been deprecated, remove this
         # check chimerascan config
-        #species_dir = os.path.join(server.references_dir, genome.root_dir)
-        #if not self.chimerascan_config.is_valid(species_dir):
-        #    logging.error("Chimerascan missing required files")
-        #    valid = False
-        # check bwa config
+        species_dir = os.path.join(server.references_dir, genome.root_dir)
+        if not self.chimerascan_config.is_valid(species_dir):
+            logging.error("Chimerascan missing required files")
+            valid = False
+        #check bwa config
         if not self.bwa_config.is_valid():
             logging.error("Invalid BWA configuration")
             valid = False
@@ -945,19 +965,19 @@ class PipelineConfig(object):
             valid = False
         # TODO: chimerascan deprecated so remove this
         # chimerascan binary
-        #msg = 'chimerascan'
-        #if check_executable("chimerascan_run.py"):
-        #    logging.debug("Checking for '%s' binary... found" % msg)
-        #else:
-        #    logging.error("'%s' binary not found or not executable" % msg)
-        #    valid = False            
-        # check for chimerascan libraries
-        #try:
-        #    import chimerascan
-        #    logging.debug("Checking for 'chimerascan' library... found")
-        #except ImportError, e:
-        #    logging.error("Package 'chimerascan' not found")
-        #    valid = False
+        msg = 'chimerascan'
+        if check_executable("chimerascan_run.py"):
+            logging.debug("Checking for '%s' binary... found" % msg)
+        else:
+            logging.error("'%s' binary not found or not executable" % msg)
+            valid = False            
+        #check for chimerascan libraries
+        try:
+            import chimerascan
+            logging.debug("Checking for 'chimerascan' library... found")
+        except ImportError, e:
+            logging.error("Package 'chimerascan' not found")
+            valid = False
         # check bwa
         msg = 'BWA'
         if check_executable(self.bwa_bin):
