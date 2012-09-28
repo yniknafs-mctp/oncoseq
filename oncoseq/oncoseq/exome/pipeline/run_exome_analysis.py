@@ -9,7 +9,7 @@ import os
 
 from oncoseq.lib import config
 from oncoseq.lib.base import up_to_date
-from oncoseq.lib.seqdb import SAMPLE_TYPE_EXOME_TUMOR, SAMPLE_TYPE_EXOME_NORMAL
+from oncoseq.lib.seqdb import SAMPLE_TYPE_EXOME_TUMOR, SAMPLE_TYPE_EXOME_NORMAL,VALID_EXOME_KITS
 
 # setup pipeline script files
 import oncoseq.pipeline
@@ -409,10 +409,12 @@ def run_sample(sample, genome, server, pipeline, num_processors,
     # process libraries
     library_deps = []
     for library in sample.libraries:
-        logging.info("Analyzing library: %s" % (library.id)) 
+        logging.info("Analyzing library: %s" % (library.id))
         #
         # create library directory
         # 
+        # It assumes that the kit is the same for all libraries that belong to a particular sample
+        exome_kit=library.capture_kit
         if not os.path.exists(library.output_dir):
             logging.info("Creating directory: %s" % (library.output_dir))
             os.makedirs(library.output_dir)
@@ -598,7 +600,12 @@ def run_sample(sample, genome, server, pipeline, num_processors,
         logging.info("[SKIPPED] %s" % msg)
     else:
         logging.info(msg)
-        caputure_kit=config.EXOME_KITS[pipeline.exome_kit]
+        if exome_kit in VALID_EXOME_KITS:
+            caputure_kit=VALID_EXOME_KITS[exome_kit]
+        else:
+            msg="[INFO: WARNING] The specified exome capture kit for sample %s sample is not a valid kit. Using default" %(sample.name)
+            logging.info(msg)
+            caputure_kit=VALID_EXOME_KITS["agilent_v4"]
         args = [sys.executable, os.path.join(_exome_pipeline_dir, "target_coverage.py"),
                 sample.merged_cleaned_bam_efile,
                 os.path.join(server.references_dir, genome.get_path(caputure_kit)),# "capture_agilent"

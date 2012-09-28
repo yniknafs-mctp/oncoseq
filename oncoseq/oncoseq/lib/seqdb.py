@@ -50,6 +50,10 @@ PROTOCOL_POLYA_RNA = "rnaseq"
 PROTOCOL_EXOME_RNA = "capture_rnaseq"
 VALID_PROTOCOLS = (PROTOCOL_EXOME_DNA, PROTOCOL_POLYA_RNA, PROTOCOL_EXOME_RNA)
 
+# Exome kits
+VALID_EXOME_KITS={'agilent_v4':"capture_agilent", 'roche_v2':"capture_roche", 'truseq':"capture_truseq"}
+
+
 class SeqDBError(Exception):
     pass
 

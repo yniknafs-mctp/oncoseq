@@ -167,9 +167,6 @@
     <mapping_qual>10</mapping_qual>
   </bwa>
 
-  <!--EXOME KIT should be one of AGILENT, ROCHE, TRUSEQ -->
-  <exome_kit>AGILENT</exome_kit>
-
   <!--Varscan Parameters -->
   <varscan>
     <min_coverage>1</min_coverage>
