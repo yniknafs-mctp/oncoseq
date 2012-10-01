@@ -29,18 +29,15 @@ die = function(x)
 }
 
 args = commandArgs(trailingOnly = TRUE);
-if(length(args) < 2) { die("Usage: TC.r [normal baf] [tumor baf]"); }
-c(normal.baf.fp,tumor.baf.fp) := args;
-
-normal.baf.fp = "ab.normal.baf"
-tumor.baf.fp = "ab.tumor.baf"
+if(length(args) < 3) { die("Usage: TC.r [normal baf] [tumor baf] [output file]"); }
+c(normal.baf.fp,tumor.baf.fp,output.fp) := args;
 
 normal.baf = read.delim(normal.baf.fp, header=T)
-tumor.baf  = read.delim(tumor.baf.fp, header=T)
+tumor.baf  = read.delim(tumor.baf.fp,  header=T)
 
 eLOH = LOH.analyze(normal.baf, tumor.baf, alpha=0.01, method="two.sample.fisher")
 colnames(eLOH)[colnames(eLOH) == "normal.baf"] = "normal.b.coverage"
-colnames(eLOH)[colnames(eLOH) == "tumor.baf"] = "tumor.b.coverage"
+colnames(eLOH)[colnames(eLOH) == "tumor.baf"]  = "tumor.b.coverage"
 
 eLOH$normal.baf = eLOH$normal.b.coverage / eLOH$normal.coverage
 eLOH$tumor.baf  = eLOH$tumor.b.coverage  / eLOH$tumor.coverage
@@ -49,7 +46,7 @@ eLOH$contam = NA
 eLOH[eLOH$normal.baf >  eLOH$tumor.baf,"contam"] = 2 *      eLOH[eLOH$normal.baf >  eLOH$tumor.baf,"tumor.baf"]
 eLOH[eLOH$normal.baf <= eLOH$tumor.baf,"contam"] = 2 * (1 - eLOH[eLOH$normal.baf <= eLOH$tumor.baf,"tumor.baf"])
 
-write(mean(eLOH[eLOH$LOH == TRUE,"contam"]),stdout())
+write(mean(eLOH[eLOH$LOH == TRUE,"contam"]),output.fp)
 #write(median(eLOH[eLOH$LOH == TRUE,"contam"]),stdout())
 
 #par(mfrow=c(3,2))
