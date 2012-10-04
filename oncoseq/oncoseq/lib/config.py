@@ -191,6 +191,14 @@ LOH_FILE = "exome_loh.txt"
 CNV_PLOT = "exome_cnv_plot"
 CNV_R_BACKUP="exome_cnv_R_backup"
 DEFAULT_TUMOR_CONTENT=0.5
+BAF_NORMAL_FILE="baf_normal_file.txt"
+BAF_TUMOR_FILE="baf_tumor_file.txt"
+BAF_JOB_MEM = 3750
+BAF_JOB_WALLTIME = "48:00:00"
+TUMOR_CONTENT_ESTIMATE="tumor_content_estimate.txt"
+TUMOR_CONTENT_JOB_MEM=3750
+TUMOR_CONTENT_JOB_WALLTIME="10:00:00"
+
 # files for exome analysis
 # alignment results
 ALIGNED_READS_SAM = "aligned_reads.sam"
@@ -393,6 +401,10 @@ def attach_sample_group_to_results(grp, root_dir):
     grp.exome_loh_file = os.path.join(grp.output_dir, LOH_FILE)
     grp.exome_cnv_plot = os.path.join(grp.output_dir, CNV_PLOT)
     grp.exome_cnv_rbackup = os.path.join(grp.output_dir,CNV_R_BACKUP)
+    grp.baf_normal_file=os.path.join(grp.output_dir,BAF_NORMAL_FILE)
+    grp.baf_tumor_file=os.path.join(grp.output_dir,BAF_TUMOR_FILE)
+    grp.tumor_content_estimate=os.path.join(grp.output_dir,TUMOR_CONTENT_ESTIMATE)
+    
     # attach samples to results
     for sample_type, sample in grp.samples.iteritems():
         if sample is None:
@@ -471,7 +483,8 @@ class GenomeConfig(object):
                   "cosmic_positions",
                   "capture_roche",
                   "capture_agilent",
-                  "capture_TruSeq"
+                  "capture_truseq",
+                  "capture_agilent_v3",
                   "exome_bed_file")
     
     @staticmethod
@@ -725,6 +738,7 @@ class PipelineConfig(object):
             c.picard_dir = os.environ["PICARDPATH"]
         if "VARSCANPATH" in os.environ:
             c.varscan_dir = os.environ["VARSCANPATH"]
+        
         # default fragment size parameters
         c.fragment_size_mean_default = int(root.findtext("fragment_size_mean_default"))
         c.fragment_size_stdev_default = int(root.findtext("fragment_size_stdev_default"))
@@ -795,6 +809,7 @@ class PipelineConfig(object):
         for arg in self.cufflinks_args:
             elem = etree.SubElement(cufflinks_elem, "arg")
             elem.text = arg
+        # Include the element of cufflinks_assambly here
         # TODO: chimerascan has now been deprecated, remove this
         # chimerascan parameters
         chimerascan_elem = etree.SubElement(root, "chimerascan")

@@ -601,14 +601,14 @@ def run_sample(sample, genome, server, pipeline, num_processors,
     else:
         logging.info(msg)
         if exome_kit in VALID_EXOME_KITS:
-            caputure_kit=VALID_EXOME_KITS[exome_kit]
+            capture_kit=VALID_EXOME_KITS[exome_kit]
         else:
             msg="[INFO: WARNING] The specified exome capture kit for sample %s sample is not a valid kit. Using default" %(sample.name)
             logging.info(msg)
-            caputure_kit=VALID_EXOME_KITS["agilent_v4"]
+            capture_kit=VALID_EXOME_KITS["agilent_v4"]
         args = [sys.executable, os.path.join(_exome_pipeline_dir, "target_coverage.py"),
                 sample.merged_cleaned_bam_efile,
-                os.path.join(server.references_dir, genome.get_path(caputure_kit)),# "capture_agilent"
+                os.path.join(server.references_dir, genome.get_path(capture_kit)),# "capture_agilent"
                 sample.probe_coverage_file,
                 sample.probe_summary_file,
                 pipeline.vscan_config.min_avgbase_quality]
@@ -636,6 +636,34 @@ def run_sample(sample, genome, server, pipeline, num_processors,
         logging.info("[SKIPPED] %s" % (msg))
     else:
         logging.info(msg)
+        # pipeline.bedtools_dir: there is no really a path to this, the module is added
+        args=[sys.executable, os.path.join(_exome_pipeline_dir, "genome_coverage.py"),
+              (os.path.join(server.references_dir, genome.get_path("chrom_sizes"))),
+              sample.merged_cleaned_bam_efile,sample.coverage_bedgraph_file]
+        
+        log_file = os.path.join(log_dir, "genomeCoverageBed.log")
+        logging.debug(os.path.join(pipeline.bedtools_dir, "genomeCoverageBed"))
+        logging.debug("\targs: %s" % (' '.join(map(str, args))))
+        job_id = submit_job_func("bedtools_%s" % (sample.id), args,
+                                 num_processors=1,
+                                 node_processors=server.node_processors,
+                                 node_memory=server.node_mem,
+                                 pbs_script_lines=server.pbs_script_lines,
+                                 working_dir=sample.output_dir,
+                                 mem=config.COVERAGE_JOB_MEM,
+                                 walltime=config.COVERAGE_JOB_WALLTIME,
+                                 deps=cleaning_dep,
+                                 stderr_filename=log_file)
+        bedgraph_deps = [job_id]
+        
+    '''
+    msg = "Generating coverage bedgraph file"
+    bedgraph_deps = []
+    if (up_to_date(sample.coverage_bedgraph_file, sample.merged_cleaned_bam_efile)):
+        logging.info("[SKIPPED] %s" % (msg))
+    else:
+        logging.info(msg)
+                
         args = [os.path.join(pipeline.bedtools_dir, "genomeCoverageBed"),
                 "-bg", "-split", "-g", (os.path.join(server.references_dir, genome.get_path("chrom_sizes"))),
                 "-ibam", sample.merged_cleaned_bam_efile]
@@ -653,6 +681,29 @@ def run_sample(sample, genome, server, pipeline, num_processors,
                                  stdout_filename=sample.coverage_bedgraph_file,
                                  stderr_filename=log_file)
         bedgraph_deps = [job_id]
+    '''
+    '''    
+    # TODO: 10-2-2012
+    # This is just temporary to ensure that bedGraph was created
+    # Some times the bigWug process starts before the process the writting finishes.
+    msg="Checking that the genomeCoverageBed was created in the correct location"
+    logging.info(msg)
+    args = ['ls' ,'-lrth',sample.coverage_bedgraph_file]
+                    
+    log_file = os.path.join(log_dir, "genomeCoverageBed_test.log")
+    logging.debug("\targs: %s" % (' '.join(map(str, args))))
+    job_id = submit_job_func("check_genCov_%s" % (sample.id), args,
+                             num_processors=1,
+                             node_processors=server.node_processors,
+                             node_memory=server.node_mem,
+                             pbs_script_lines=server.pbs_script_lines,
+                             working_dir=sample.output_dir,
+                             mem=config.NOTIFY_COMPLETE_JOB_MEM,
+                             walltime=config.NOTIFY_COMPLETE_JOB_WALLTIME,
+                             deps=bedgraph_deps,
+                             stderr_filename=log_file)
+    bedgraph_deps.append(job_id)    
+    '''
     #
     # convert bedgraph to bigwig coverage file
     #
@@ -678,7 +729,29 @@ def run_sample(sample, genome, server, pipeline, num_processors,
                                  deps=bedgraph_deps,
                                  stderr_filename=log_file)
         bigwig_deps = [job_id]
-
+    
+    #
+    # Removee temporary bedGraph file
+    #
+    msg = "Remove temporary bedGraph files"
+    rm_deps = []
+    if (os.path.exists(sample.coverage_bigwig_file)):
+        logging.info("[SKIPPED] %s" % (msg))
+        logging.info(msg)
+        args = ["rm", sample.coverage_bedgraph_file]
+        log_file = os.path.join(log_dir, "remove_genomeCoverageBed.log")
+        job_id = submit_job_func("rmgenCov_%s" % (sample.id), args,
+                                 num_processors=1,
+                                 node_processors=server.node_processors,
+                                 node_memory=server.node_mem,
+                                 pbs_script_lines=server.pbs_script_lines,
+                                 working_dir=sample.output_dir,
+                                 walltime=config.CLEANUP_INTERMEDIATE_FILES_JOB_MEM,
+                                 mem=config.CLEANUP_INTERMEDIATE_FILES_JOB_WALLTIME,
+                                 deps=bigwig_deps,
+                                 stderr_filename=log_file)
+        rm_deps = [job_id]
+    
     sample_deps=cleaning_dep + homo_dep + cov_pro_dep + bigwig_deps #+ cov_pro_dep #+ cov_exon_dep
     return sample_deps
 
@@ -767,6 +840,68 @@ def run_sample_group(grp, genome, server, pipeline, num_processors,
                                  stdout_filename=log_stdout_file,
                                  stderr_filename=log_stderr_file)
         varscan_deps = [job_id]
+    
+
+    #
+    # Calculating Tumor Content
+    #
+     
+    msg = "Estimating baf content"
+    baf_deps = []
+    if (up_to_date(grp.baf_normal_file, grp.varscan_snv_file) and
+        up_to_date(grp.baf_tumor_file, grp.varscan_snv_file) 
+        ):
+        logging.info("[SKIPPED] %s" % msg)
+    else:
+        logging.info(msg)
+        args = [sys.executable, os.path.join(_exome_pipeline_dir, "vs2baf.py"),
+                grp.varscan_snv_file,
+                grp.baf_normal_file,
+                grp.baf_tumor_file]
+        log_stdout_file = os.path.join(log_dir, "baf_estimation_stdout.log")
+        log_stderr_file = os.path.join(log_dir, "baf_estimation_stderr.log")
+        logging.debug("\targs: %s" % (' '.join(map(str, args))))
+        job_id = submit_job_func("baf_estimation_%s" % (grp.id), args,
+                                 num_processors=1,
+                                 node_processors=server.node_processors,
+                                 node_memory=server.node_mem,
+                                 mem= config.BAF_JOB_MEM,#2 pmem
+                                 pbs_script_lines=server.pbs_script_lines,
+                                 working_dir=grp.output_dir,
+                                 walltime=config.BAF_JOB_WALLTIME,
+                                 deps=varscan_deps,
+                                 stdout_filename=log_stdout_file,
+                                 stderr_filename=log_stderr_file)
+        baf_deps = [job_id]
+
+   
+    msg = "Estimating tumor content"
+    tc_deps = []
+    if (up_to_date(grp.tumor_content_estimate, grp.baf_normal_file) and
+        up_to_date(grp.tumor_content_estimate, grp.baf_tumor_file)):
+        logging.info("[SKIPPED] %s" % msg)
+    else:
+        logging.info(msg)
+        args = [pipeline.rscript_bin,os.path.join(_exome_pipeline_dir, "TC.r"), 
+                grp.baf_normal_file,
+                grp.baf_tumor_file,
+                grp.tumor_content_estimate
+                ]             
+        log_stderr_file = os.path.join(log_dir, "tumor_content_stderr.log")
+        log_stdout_file = os.path.join(log_dir, "tumor_content_stdout.log")
+        logging.debug("\targs: %s" % (' '.join(map(str, args))))
+        job_id = submit_job_func("TC_%s" % (grp.id), args,
+                                 num_processors=1,
+                                 node_processors=server.node_processors,
+                                 node_memory=server.node_mem,
+                                 pbs_script_lines=server.pbs_script_lines,
+                                 working_dir=grp.output_dir,
+                                 mem=config.TUMOR_CONTENT_JOB_MEM,
+                                 walltime=config.TUMOR_CONTENT_JOB_WALLTIME,
+                                 deps=baf_deps,
+                                 stdout_filename=log_stdout_file,
+                                 stderr_filename=log_stderr_file)
+        tc_deps = [job_id]
     #
     # Running CNV analysis with Exome CNV
     #
@@ -814,8 +949,9 @@ def run_sample_group(grp, genome, server, pipeline, num_processors,
         cnv_deps = [job_id]
     
         
+        
     # all dependencies for sample group
-    grp_deps = samtools_snv_deps + varscan_deps + cnv_deps
+    grp_deps = samtools_snv_deps + varscan_deps + cnv_deps # tc_deps
     #
     # write file indicating sample group jobs are complete
     #

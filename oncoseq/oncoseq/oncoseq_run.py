@@ -127,17 +127,15 @@ def run_remote(analysis_file, config_file, server_name, num_processors,
                             else:
                                 logging.info("Fastq file %s not found on remote server" % (local_file))
                         
-                        
                         if server.job_seq_repo_mirror_dir is not None and not found:
                             # test if file exists at remote temporary server sequence for the jobs 
                             # that have been run recently.
                             ext = os.path.splitext(local_file)[-1]
-                            remote_file = os.path.join(server.job_seq_repo_mirror_dir, "%s_%d%s" % (lane.id, readnum+1, ext))
-                            '''
+                            # This two files should be the same
+                            #remote_file = os.path.join(server.job_seq_repo_mirror_dir, "%s_%d%s" % (lane.id, readnum+1, ext))
                             remote_file = os.path.join(server.job_seq_repo_mirror_dir,
                                                        os.path.basename(local_file))
-                            '''
-                            print remote_file
+                            
                             if test_file_exists(remote_file, server.address, 
                                                 username, server.ssh_port):
                                 logging.info("Found fastq file %s at temporary repository %s" % (local_file, remote_file))

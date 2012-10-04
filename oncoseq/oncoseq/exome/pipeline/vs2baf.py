@@ -12,7 +12,7 @@ from collections import defaultdict
 
 def vcf_header():
     
-    header=['#CHROM\tPOS\tDP\tBAF']
+    header=['chr\tposition\tcoverage\tbaf']
     
     return header
 

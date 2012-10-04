@@ -194,6 +194,8 @@
     <cosmic_positions>Annotation/Exome/CosmicMutations_AtInformativeGenes_cosmic_v56_151111.3.bed</cosmic_positions>
     <capture_roche>Annotation/Exome/Roche_probes_coords_EZExome2_Tiled.bed</capture_roche>
     <capture_agilent>Annotation/Exome/SureSelect_probes_coords_50MbKit.GRCh37.bed</capture_agilent>
+    <capture_agilent_v3>Annotation/Exome/SureSelect_probes_coords_50MbKit.GRCh37.bed</capture_agilent_v3>
+    <capture_truseq>Annotation/Exome/TruSeq_Exome_Targeted_Regions.bed</capture_truseq>
     <exome_bed_file>Annotation/Exome/CCDSGene.B37.bed</exome_bed_file>
   </species>
 
