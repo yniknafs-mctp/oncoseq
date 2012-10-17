@@ -35,8 +35,8 @@ all.sens          = 0.99;
 display.CN.cutoff = 1; # = Inf (for everything)
 all.sdundo        = c(1, 2);       #default - must be length 2
 all.alpha         = c(0.05, 0.01); #default - must be length 2
-plot.height       = 800;
-plot.width        = 1600;
+plot.height       = 800; #png, pdf = 6
+plot.width        = 1600; #png, pdf = 12
 graphing.offset   = 1000000;
 
 chr.list          = paste("chr",c(1:22,"X","Y"),sep=""); #levels()?
@@ -238,7 +238,8 @@ doCNV = function(normal,tumor,logR,read.length,tumor.content)
 }
 plot.CNV.default = function(output.fp,all.CNV,exon.CNV)
 {
-  pdf(file = output.fp, width = plot.width, height = plot.height);
+  #pdf(file = output.fp, width = plot.width, height = plot.height);
+  png(filename = output.fp, width = plot.width, height = plot.height);
   display.quantile = 1;
   
   do.plot.eCNV(all.CNV,
@@ -250,8 +251,10 @@ plot.CNV.default = function(output.fp,all.CNV,exon.CNV)
 }
 plot.CNV.fancy = function(output.fp,all.CNV,exon.CNV,plot.title)
 {
-  pdf(file = output.fp, width = plot.width, height = plot.height);
-    
+  #pdf(file = output.fp, width = plot.width, height = plot.height);
+  #CairoPNG(filename = output.fp, width = plot.width, height = plot.height);
+  png(filename = output.fp, width = plot.width, height = plot.height);
+  
   #defining colors dynamically
   max.cn = max(all.CNV$copy.number, na.rm = TRUE);
   reds = rainbow(2^(max.cn - 2), start = 3/4, end = 0)[2^(max.cn:3 - 2)];
