@@ -361,6 +361,7 @@ if(length(args) < 9)
 c(normal.fp,tumor.fp,output.LOH,output.CNV,output.plot,rdata,plot.title) := args;
 read.length = as.numeric(args[8]); #(read1 + read2) / 2, rounded down
 tumor.content = as.numeric(args[9]);
+tumor.content = 1;
 if(length(args) > 9){ silent = as.numeric(args[10]); }
 if(!silent){ printTime("checking input sortedness"); }
 dieIfUnsorted(normal.fp);
