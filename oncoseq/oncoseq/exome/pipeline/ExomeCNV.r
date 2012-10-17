@@ -238,7 +238,7 @@ doCNV = function(normal,tumor,logR,read.length,tumor.content)
 }
 plot.CNV.default = function(output.fp,all.CNV,exon.CNV)
 {
-  pdf(filename = output.fp, width = plot.width, height = plot.height);
+  pdf(file = output.fp, width = plot.width, height = plot.height);
   display.quantile = 1;
   
   do.plot.eCNV(all.CNV,
@@ -250,7 +250,7 @@ plot.CNV.default = function(output.fp,all.CNV,exon.CNV)
 }
 plot.CNV.fancy = function(output.fp,all.CNV,exon.CNV,plot.title)
 {
-  pdf(filename = output.fp, width = plot.width, height = plot.height);
+  pdf(file = output.fp, width = plot.width, height = plot.height);
     
   #defining colors dynamically
   max.cn = max(all.CNV$copy.number, na.rm = TRUE);
