@@ -38,8 +38,8 @@ def print_baf_line(fdict,fields,normal=True):
     '''
     # Mandatory fields
     mf = [fields['CHROM'],fields['POS']]
-    baf_n=[fields['DPN1']+fields['DPN2'],fields['DPN2']]
-    baf_t=[fields['DPT1']+fields['DPT2'],fields['DPT2']]
+    baf_n=[str(int(fields['DPN1'])+int(fields['DPN2'])),fields['DPN2']]
+    baf_t=[str(int(fields['DPT1'])+int(fields['DPT2'])),fields['DPT2']]
     if normal:
         mf=mf+baf_n
     else:
@@ -60,7 +60,7 @@ def baf_from_varscan(ifile,normal_baf,tumor_baf):
     header = ifile.next()
     MAPPING_QUAL=20
     MIN_QUAL=30
-              
+    MIN_HET, MAX_HET=0.1, 0.75          
     fdict={'CHROM':0,'POS':1,'REF':2,'ALT':3,
             'DPN1':4,'DPN2':5,'VFN':6,'AAN':7,
             'DPT1':8,'DPT2':9,'VFT':10,'AAT':11,
@@ -85,7 +85,7 @@ def baf_from_varscan(ifile,normal_baf,tumor_baf):
         fields['ID']='.'#fields['CHROM']+'@'+fields['POS'] 
         
         # Define if the snp is heterozygous or not in the germline.s
-        if float(fields['VFN']) >= 0.1 and float(fields['VFN']) <= 0.75:
+        if float(fields['VFN']) >= MIN_HET and float(fields['VFN']) <= MAX_HET:
             #write the normal baf and the tumor baf
             normal_ofile.write( "chr"+",".join(print_baf_line(fdict,fields)).replace(',','\t')+'\n')
             tumor_ofile.write( "chr"+",".join(print_baf_line(fdict,fields,False)).replace(',','\t')+'\n')

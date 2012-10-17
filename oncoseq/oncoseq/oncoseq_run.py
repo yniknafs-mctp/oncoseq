@@ -132,9 +132,9 @@ def run_remote(analysis_file, config_file, server_name, num_processors,
                             # that have been run recently.
                             ext = os.path.splitext(local_file)[-1]
                             # This two files should be the same
-                            #remote_file = os.path.join(server.job_seq_repo_mirror_dir, "%s_%d%s" % (lane.id, readnum+1, ext))
-                            remote_file = os.path.join(server.job_seq_repo_mirror_dir,
-                                                       os.path.basename(local_file))
+                            remote_file = os.path.join(server.job_seq_repo_mirror_dir, "%s_%d%s" % (lane.id, readnum+1, ext))
+                            #remote_file = os.path.join(server.job_seq_repo_mirror_dir,
+                            #                           os.path.basename(local_file))
                             
                             if test_file_exists(remote_file, server.address, 
                                                 username, server.ssh_port):
@@ -143,7 +143,19 @@ def run_remote(analysis_file, config_file, server_name, num_processors,
                                 # modify analysis config to point to remote file
                                 setattr(lane, attrname, remote_file)
                             else:
-                                logging.info("Fastq file %s not found on temporary remote server" % (local_file))
+                                remote_file = os.path.join(server.job_seq_repo_mirror_dir,
+                                                       os.path.basename(local_file))
+                                
+                                if test_file_exists(remote_file, server.address, 
+                                                    username, server.ssh_port):
+                                    logging.info("Found fastq file %s at temporary repository %s" % (local_file, remote_file))
+                                    found = True
+                                    # modify analysis config to point to remote file
+                                    setattr(lane, attrname, remote_file)
+                                else:
+                                    logging.info("Fastq file %s not found on temporary remote server as %s" % (local_file,remote_file))
+                                
+                                
 
                         if not found:
                             # copy fastq files to remote location and 

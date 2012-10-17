@@ -14,16 +14,16 @@ from oncoseq.lib.base import up_to_date
 from oncoseq.lib import config
 
 
-def markDuplicates(indexed_bam_file, outfile, picard_dir, use_mem=2048):
+def markDuplicates(indexed_bam_file, outfile, picard_dir, tmp_dir, use_mem=2048):
     '''
     '''
     picard_command=os.path.join(picard_dir,'MarkDuplicates.jar')
     metrics_file=indexed_bam_file.replace('.bam','.duplicates.stats')
-    
-    args=['java','-Xmx'+str(use_mem)+'m','-jar', picard_command, 
+    default_mem=2048
+    args=['java','-Xmx'+str(use_mem-default_mem)+'m',"-Djava.io.tmpdir=",tmp_dir,'-jar', picard_command, 
           'I='+indexed_bam_file, 'O='+outfile, 'METRICS_FILE='+metrics_file,
           'ASSUME_SORTED=true','VALIDATION_STRINGENCY=SILENT',
-          'REMOVE_DUPLICATES=true'
+          'REMOVE_DUPLICATES=true',"TMP_DIR=",tmp_dir
           ]
     
     cmd = ",".join(args).replace(',',' ').replace(';',',')
@@ -32,25 +32,26 @@ def markDuplicates(indexed_bam_file, outfile, picard_dir, use_mem=2048):
 
 def sortIndexSam(input_sam_file, output_bam_file, 
                 picard_dir, sort_order='coordinate',
-                use_mem=2048):
+                tmp_dir,use_mem=2048):
     '''
     sort sam or bam
     SO=SortOrder Sort order of output file  Required. Possible values: {unsorted, queryname, coordinate} 
     '''
     picard_command = os.path.join(picard_dir,"SortSam.jar")
-
-    args = ['java', '-Xmx'+str(use_mem)+'m', '-jar', picard_command, 
+    default_mem=2048
+    args = ['java', '-Xmx'+str(use_mem-default_mem)+'m', "-Djava.io.tmpdir=",tmp_dir,'-jar', picard_command, 
             'I=%s' % (input_sam_file), 
             'O=%s' % (output_bam_file),
             'SORT_ORDER=%s' % (sort_order),
             'CREATE_INDEX=true',
-            'VALIDATION_STRINGENCY=SILENT']
+            'VALIDATION_STRINGENCY=SILENT',
+            "TMP_DIR=",tmp_dir]
     
     cmd = ",".join(args).replace(',',' ').replace(';',',')
     return cmd
 
 
-def bam_cleaner(bam_file, bam_smdup_file, picard_dir,tmp_dir):
+def bam_cleaner(bam_file, bam_smdup_file, picard_dir,tmp_dir,tmp_mem):
     '''
     It cleans and merged all the lane files belonging to the 
     same sample
@@ -68,7 +69,7 @@ def bam_cleaner(bam_file, bam_smdup_file, picard_dir,tmp_dir):
     else:       
         # Mark duplicates in the merged Bam file\n
         logging.info("SAM BAM CLEANER. Remove duplicates step for file %s" % (bam_smdup_file))
-        args = markDuplicates(bam_file, btmp,picard_dir) #,MEM_PER_CORE,
+        args = markDuplicates(bam_file, btmp,picard_dir,tmp_dir,tmp_mem) #,MEM_PER_CORE,
         print args
         retcode = subprocess.call(args,shell=True)
         
@@ -78,7 +79,7 @@ def bam_cleaner(bam_file, bam_smdup_file, picard_dir,tmp_dir):
                 os.remove(btmp)
             return config.JOB_ERROR
         
-        args  = sortIndexSam(btmp, bam_smdup_file, picard_dir) #,MEM_PER_CORE)
+        args  = sortIndexSam(btmp, bam_smdup_file, picard_dir,tmp_dir,tmp_mem) #,MEM_PER_CORE)
         print args
         retcode = subprocess.call(args,shell=True)
 
@@ -106,14 +107,18 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--picard-dir", dest="picard_dir", default="")
     parser.add_argument("--tmp-dir", dest="tmp_dir", default="")    
+    parser.add_argument("--java-mem",dest="java_mem", default="")
     parser.add_argument("bam_file")
     parser.add_argument("bam_smdup")
+    
+    
     args = parser.parse_args()
     
     return bam_cleaner(args.bam_file,
                        args.bam_smdup,
                        args.picard_dir, 
-                       args.tmp_dir)
+                       args.tmp_dir,
+                       args.java_mem)
 
 if __name__ == '__main__': 
     sys.exit(main())

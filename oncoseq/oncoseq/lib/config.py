@@ -156,7 +156,7 @@ SYMBOLIC_LINK_JOB_MEM=3750
 SYMBOLIC_LINK_JOB_WALLTIME="1:00:00"
 COSMIC_COVERAGE_JOB_MEM=3750
 COSMIC_COVERAGE_JOB_WALLTIME="24:00:00"
-CAPTURE_COVERAGE_JOB_MEM=3750
+CAPTURE_COVERAGE_JOB_MEM=8192
 CAPTURE_COVERAGE_JOB_WALLTIME="24:00:00"
 EXOME_CNV_JOB_MEM=8192
 EXOME_CNV_JOB_WALLTIME="60:00:00"
@@ -193,10 +193,10 @@ CNV_R_BACKUP="exome_cnv_R_backup"
 DEFAULT_TUMOR_CONTENT=0.5
 BAF_NORMAL_FILE="baf_normal_file.txt"
 BAF_TUMOR_FILE="baf_tumor_file.txt"
-BAF_JOB_MEM = 3750
+BAF_JOB_MEM = 8192
 BAF_JOB_WALLTIME = "48:00:00"
 TUMOR_CONTENT_ESTIMATE="tumor_content_estimate.txt"
-TUMOR_CONTENT_JOB_MEM=3750
+TUMOR_CONTENT_JOB_MEM=8192
 TUMOR_CONTENT_JOB_WALLTIME="10:00:00"
 
 # files for exome analysis
@@ -773,6 +773,15 @@ class PipelineConfig(object):
         
         ###########
         ##Parameters for the EXOME pipeline
+        # By default match normal is assumed
+        match_normal = root.findtext("exome_match_normal")
+        if match_normal is not None:
+            if match_normal=="1":
+                c.match_normal = True
+            else:
+                c.match_normal = False
+        else:
+            c.match_normal = True
         # bwa parameters 
         c.bwa_config = BWAConfig.from_xml_elem(root.find("bwa"))
         # varscan parameters

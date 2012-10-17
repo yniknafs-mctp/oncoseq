@@ -378,6 +378,7 @@ def run_library(library, genome, server, pipeline, num_processors,
         args = [sys.executable, os.path.join(_oncoseq_pipeline_dir, "bam_cleaner.py"),
                 "--picard-dir",pipeline.picard_dir,
                 "--tmp-dir",tmp_dir,
+                "--java-mem",config.BAM_CLEANING_JOB_MEM,
                 library.merged_bam_efile,
                 library.merged_cleaned_bam_efile]
         
@@ -755,7 +756,35 @@ def run_sample(sample, genome, server, pipeline, num_processors,
     sample_deps=cleaning_dep + homo_dep + cov_pro_dep + bigwig_deps #+ cov_pro_dep #+ cov_exon_dep
     return sample_deps
 
+
 def run_sample_group(grp, genome, server, pipeline, num_processors,
+                     submit_job_func, keep_tmp):
+    
+    if pipeline.match_normal:
+        # check exome samples
+        tumor_sample = grp.samples[SAMPLE_TYPE_EXOME_TUMOR]
+        benign_sample = grp.samples[SAMPLE_TYPE_EXOME_NORMAL]
+
+        if (benign_sample is None) or (tumor_sample is None):
+            logging.info("Skipping exome analysis with match normal: tumor and/or benign exome samples missing")
+            #return [config.JOB_SUCCESS]
+            return []
+        # process samples
+        return run_sample_group_match_benign(grp, genome, server, pipeline, num_processors,
+                     submit_job_func, keep_tmp) 
+        
+    else:
+        # check exome samples
+        tumor_sample = grp.samples[SAMPLE_TYPE_EXOME_TUMOR]
+        if (tumor_sample is None):
+            logging.info("Skipping exome analysis without match notmal: tumor exome sample missing")
+            #return [config.JOB_SUCCESS]
+            return []
+        return run_sample_group_not_benign(grp, genome, server, pipeline, num_processors,
+                     submit_job_func, keep_tmp)
+        
+
+def run_sample_group_match_benign(grp, genome, server, pipeline, num_processors,
                      submit_job_func, keep_tmp):
     # check exome samples
     tumor_sample = grp.samples[SAMPLE_TYPE_EXOME_TUMOR]
@@ -952,6 +981,110 @@ def run_sample_group(grp, genome, server, pipeline, num_processors,
         
     # all dependencies for sample group
     grp_deps = samtools_snv_deps + varscan_deps + cnv_deps # tc_deps
+    #
+    # write file indicating sample group jobs are complete
+    #
+    deps = grp_deps
+    msg = "Notifying user that sample group jobs are complete"
+    if (os.path.exists(grp.dna_job_complete_file) or (len(grp_deps) == 0)):
+        logging.info("[SKIPPED]: %s" % msg)
+    else:
+        logging.info(msg)
+        args = [sys.executable, os.path.join(_oncoseq_pipeline_dir, "notify_complete.py"),
+                grp.dna_job_complete_file]
+        job_id = submit_job_func("dnadone_%s" % (grp.id), args,
+                                 num_processors=1,
+                                 node_processors=server.node_processors,
+                                 node_memory=server.node_mem,
+                                 pbs_script_lines=server.pbs_script_lines,
+                                 working_dir=grp.output_dir,
+                                 mem=config.NOTIFY_COMPLETE_JOB_MEM,
+                                 walltime=config.NOTIFY_COMPLETE_JOB_WALLTIME,
+                                 email="ae",
+                                 deps=grp_deps)
+        deps = [job_id]
+    return deps
+
+def run_sample_group_not_benign(grp, genome, server, pipeline, num_processors,
+                     submit_job_func, keep_tmp):
+    # check exome samples
+    tumor_sample = grp.samples[SAMPLE_TYPE_EXOME_TUMOR]
+    # process samples
+    sample_deps=[]
+    sample_deps.extend(run_sample(tumor_sample, genome, server, pipeline, 
+                                  num_processors, submit_job_func))
+    # make temp directories
+    tmp_dir = os.path.join(grp.output_dir, "tmp") 
+    if not os.path.exists(tmp_dir):
+        logging.info("Creating directory: %s" % (tmp_dir))
+        os.makedirs(tmp_dir)
+    log_dir = os.path.join(grp.output_dir, "log")
+    if not os.path.exists(log_dir):
+        logging.info("Creating directory: %s" % (log_dir))
+        os.makedirs(log_dir)
+    #
+    # Call somatic variants with samtools
+    #
+    msg = "Calling somatic SNVs with samtools"
+    samtools_snv_deps = []
+    if (up_to_date(grp.samtools_vcf_file, tumor_sample.merged_cleaned_bam_efile)):
+        logging.info("[SKIPPED] %s" % msg)
+    else:
+        logging.info(msg)
+        args = [sys.executable, os.path.join(_exome_pipeline_dir, "snps_bySamtools.py"),
+                os.path.join(server.references_dir, genome.get_path("genome_bwa_index")),
+                tumor_sample.merged_cleaned_bam_efile,
+                grp.samtools_bcf_file,
+                grp.samtools_vcf_file]
+        
+        log_file = os.path.join(log_dir, "samtools_snp_calling.log")
+        log_stderr_file = os.path.join(log_dir, "samtools_snp_calling_stderr.log")
+        logging.debug("\targs: %s" % (' '.join(map(str, args))))
+        job_id = submit_job_func("samsnv_%s" % (grp.id), args,
+                                 num_processors=1,
+                                 node_processors=server.node_processors,
+                                 node_memory=server.node_mem,
+                                 pmem=config.SAMTOOLS_VARIANT_JOB_MEM,#pmem # pmem seems to produce shorter times of execution than mem. do not why ?
+                                 pbs_script_lines=server.pbs_script_lines,
+                                 working_dir=grp.output_dir,
+                                 walltime=config.SAMTOOLS_VARIANT_JOB_WALLTIME,
+                                 deps=sample_deps,
+                                 stderr_filename=log_file)
+        samtools_snv_deps = [job_id]    
+    # 
+    # Call somatic variants with varscan
+    #
+    msg = "Calling somatic SNVs with Varscan"
+    varscan_deps = []
+    if (up_to_date(grp.varscan_snv_file, tumor_sample.merged_cleaned_bam_efile)):
+        logging.info("[SKIPPED] %s" % msg)
+    else:
+        logging.info(msg)
+        args = [sys.executable, os.path.join(_exome_pipeline_dir, "snps_byVarScan.py"),
+                "--varscan-dir", pipeline.varscan_dir,
+                os.path.join(server.references_dir, genome.get_path("genome_bwa_index")),
+                tumor_sample.merged_cleaned_bam_efile,
+                grp.varscan_snv_file,
+                grp.varscan_indel_file]
+        log_stdout_file = os.path.join(log_dir, "varscan_snp_calling_stdout.log")
+        log_stderr_file = os.path.join(log_dir, "varscan_snp_calling_stderr.log")
+        logging.debug("\targs: %s" % (' '.join(map(str, args))))
+        job_id = submit_job_func("varscan_%s" % (grp.id), args,
+                                 num_processors=1,
+                                 node_processors=server.node_processors,
+                                 node_memory=server.node_mem,
+                                 mem= config.VARSCAN_VARIANT_JOB_MEM,#2 pmem
+                                 pbs_script_lines=server.pbs_script_lines,
+                                 working_dir=grp.output_dir,
+                                 walltime=config.VARSCAN_VARIANT_JOB_WALLTIME,
+                                 deps=sample_deps,
+                                 stdout_filename=log_stdout_file,
+                                 stderr_filename=log_stderr_file)
+        varscan_deps = [job_id]
+    
+        
+    # all dependencies for sample group
+    grp_deps = samtools_snv_deps + varscan_deps
     #
     # write file indicating sample group jobs are complete
     #

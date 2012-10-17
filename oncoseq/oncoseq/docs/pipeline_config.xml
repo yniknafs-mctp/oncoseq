@@ -159,6 +159,7 @@
   </chimerascan>
 
   <!--Exome Pipeline Parameters -->
+  <exome_match_normal>1</exome_match_normal>
   <!--BWA Parameters -->
   <bwa>
     <bwa_cores>6</bwa_cores>
