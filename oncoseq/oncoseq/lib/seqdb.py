@@ -143,7 +143,7 @@ class Sample(object):
     __fields__ = ("patient_id", "id", 'description',
                   'sample_type', 'nucleotide_type',
                   'cohort', 'disease',
-                  'cancer_progression')
+                  'cancer_progression','tumor_content')
 
     def __init__(self, **kwargs):
         for attrname in self.__fields__:
@@ -194,6 +194,9 @@ class Sample(object):
             is_valid = False
         if self.cancer_progression not in PROGRESSION_VALUES:
             logging.error("Invalid progression value %s" % (self.cancer_progression))
+            is_valid = False
+        if self.tumor_content != "" and (float(self.tumor_content ) > 1 or float(self.tumor_content ) < 0):
+            logging.error("tumor_content must be between 0 and 1 %s" (self.tumor_content))
             is_valid = False
         if self.patient is None:
             logging.error("Sample %s unknown patient" % (self.id))
