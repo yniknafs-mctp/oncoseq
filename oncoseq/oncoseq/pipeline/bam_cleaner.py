@@ -31,8 +31,8 @@ def markDuplicates(indexed_bam_file, outfile, picard_dir, tmp_dir, use_mem=2048)
 
 
 def sortIndexSam(input_sam_file, output_bam_file, 
-                picard_dir, sort_order='coordinate',
-                tmp_dir,use_mem=2048):
+                picard_dir, tmp_dir, use_mem=2048,
+                sort_order='coordinate'):
     '''
     sort sam or bam
     SO=SortOrder Sort order of output file  Required. Possible values: {unsorted, queryname, coordinate} 
