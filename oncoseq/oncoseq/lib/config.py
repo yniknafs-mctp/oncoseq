@@ -36,6 +36,7 @@ READ2_FASTQ_FILE = "read2.fq"
 FASTQ_FILES = (READ1_FASTQ_FILE, READ2_FASTQ_FILE)
 
 # copy uncompress sequence step
+BUFFER_JOB_MEM=1000
 COPY_UNCOMPRESS_JOB_MEM = 1000
 COPY_UNCOMPRESS_JOB_WALLTIME = "10:00:00"
 
@@ -745,6 +746,7 @@ class PipelineConfig(object):
         c.adaptor_length_default = int(root.findtext("adaptor_length_default"))
         c.min_fragment_size = int(root.findtext("min_fragment_size"))
         c.max_fragment_size = int(root.findtext("max_fragment_size"))
+        
         # tophat parameters
         c.tophat_args = []
         elem = root.find("tophat")
@@ -776,12 +778,12 @@ class PipelineConfig(object):
         # By default match normal is assumed
         match_normal = root.findtext("exome_match_normal")
         if match_normal is not None:
-            if match_normal=="1":
-                c.match_normal = True
+            if match_normal=="True":
+                c.exome_match_normal = True
             else:
-                c.match_normal = False
+                c.exome_match_normal = False
         else:
-            c.match_normal = True
+            c.exome_match_normal = True
         # bwa parameters 
         c.bwa_config = BWAConfig.from_xml_elem(root.find("bwa"))
         # varscan parameters
@@ -805,7 +807,8 @@ class PipelineConfig(object):
                          "fragment_size_stdev_default",
                          "adaptor_length_default",
                          "min_fragment_size",
-                         "max_fragment_size"):
+                         "max_fragment_size",
+                         "exome_match_normal"):
             elem = etree.SubElement(root, attrname)
             elem.text = str(getattr(self, attrname))
         # tophat parameters
@@ -818,7 +821,13 @@ class PipelineConfig(object):
         for arg in self.cufflinks_args:
             elem = etree.SubElement(cufflinks_elem, "arg")
             elem.text = arg
-        # Include the element of cufflinks_assambly here
+        # cufflinks assembly parameters
+        '''
+        cufflinks_elem = etree.SubElement(root, "cufflinks_assembly")
+        for arg in self.cufflinks_args:
+            elem = etree.SubElement(cufflinks_elem, "arg")
+            elem.text = arg        
+        '''
         # TODO: chimerascan has now been deprecated, remove this
         # chimerascan parameters
         chimerascan_elem = etree.SubElement(root, "chimerascan")

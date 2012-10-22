@@ -378,7 +378,7 @@ def run_library(library, genome, server, pipeline, num_processors,
         args = [sys.executable, os.path.join(_oncoseq_pipeline_dir, "bam_cleaner.py"),
                 "--picard-dir",pipeline.picard_dir,
                 "--tmp-dir",tmp_dir,
-                "--java-mem",config.BAM_CLEANING_JOB_MEM,
+                "--java-mem",(config.BAM_CLEANING_JOB_MEM - config.BUFFER_JOB_MEM),
                 library.merged_bam_efile,
                 library.merged_cleaned_bam_efile]
         
@@ -484,6 +484,7 @@ def run_sample(sample, genome, server, pipeline, num_processors,
                 args = [sys.executable, os.path.join(_oncoseq_pipeline_dir, "bam_cleaner.py"),
                         "--picard-dir",pipeline.picard_dir,
                         "--tmp-dir",tmp_dir,
+                        "--java-mem",(config.BAM_CLEANING_JOB_MEM - config.BUFFER_JOB_MEM),
                         sample.merged_bam_efile,
                         sample.merged_cleaned_bam_efile]
                 
@@ -604,7 +605,7 @@ def run_sample(sample, genome, server, pipeline, num_processors,
         if exome_kit in VALID_EXOME_KITS:
             capture_kit=VALID_EXOME_KITS[exome_kit]
         else:
-            msg="[INFO: WARNING] The specified exome capture kit for sample %s sample is not a valid kit. Using default" %(sample.name)
+            msg="[INFO: WARNING] The specified exome capture kit for sample %s sample is not a valid kit. Using default" %(sample.id)
             logging.info(msg)
             capture_kit=VALID_EXOME_KITS["agilent_v4"]
         args = [sys.executable, os.path.join(_exome_pipeline_dir, "target_coverage.py"),
@@ -760,10 +761,12 @@ def run_sample(sample, genome, server, pipeline, num_processors,
 def run_sample_group(grp, genome, server, pipeline, num_processors,
                      submit_job_func, keep_tmp):
     
-    if pipeline.match_normal:
+    logging.info("[EXOME ANALYSIS] Pipeline %s"%(pipeline.exome_match_normal))
+    if pipeline.exome_match_normal:
         # check exome samples
         tumor_sample = grp.samples[SAMPLE_TYPE_EXOME_TUMOR]
         benign_sample = grp.samples[SAMPLE_TYPE_EXOME_NORMAL]
+        logging.info("[EXOME ANALYSIS] Running match tumor-normal group, tumor=%s, normal=%s"%(tumor_sample,benign_sample))
 
         if (benign_sample is None) or (tumor_sample is None):
             logging.info("Skipping exome analysis with match normal: tumor and/or benign exome samples missing")
@@ -776,8 +779,10 @@ def run_sample_group(grp, genome, server, pipeline, num_processors,
     else:
         # check exome samples
         tumor_sample = grp.samples[SAMPLE_TYPE_EXOME_TUMOR]
+        logging.info("[EXOME ANALYSIS] Running analysis without match normal tumor=%s"%(tumor_sample))
+
         if (tumor_sample is None):
-            logging.info("Skipping exome analysis without match notmal: tumor exome sample missing")
+            logging.info("Skipping exome analysis without match normal: tumor exome sample missing")
             #return [config.JOB_SUCCESS]
             return []
         return run_sample_group_not_benign(grp, genome, server, pipeline, num_processors,
@@ -854,7 +859,6 @@ def run_sample_group_match_benign(grp, genome, server, pipeline, num_processors,
                 tumor_sample.merged_cleaned_bam_efile,
                 grp.varscan_snv_file,
                 grp.varscan_indel_file]
-        log_stdout_file = os.path.join(log_dir, "varscan_snp_calling_stdout.log")
         log_stderr_file = os.path.join(log_dir, "varscan_snp_calling_stderr.log")
         logging.debug("\targs: %s" % (' '.join(map(str, args))))
         job_id = submit_job_func("varscan_%s" % (grp.id), args,
@@ -866,7 +870,6 @@ def run_sample_group_match_benign(grp, genome, server, pipeline, num_processors,
                                  working_dir=grp.output_dir,
                                  walltime=config.VARSCAN_VARIANT_JOB_WALLTIME,
                                  deps=sample_deps,
-                                 stdout_filename=log_stdout_file,
                                  stderr_filename=log_stderr_file)
         varscan_deps = [job_id]
     
@@ -935,8 +938,9 @@ def run_sample_group_match_benign(grp, genome, server, pipeline, num_processors,
     # Running CNV analysis with Exome CNV
     #
     # If the not tumor content was pass for the tumor sample assign a default value
-    if 'estimated_tumor_content' in tumor_sample.params:
-        estimated_tumor_content=tumor_sample.params['estimated_tumor_content']
+    
+    if 'tumor_content' in tumor_sample.params:
+        estimated_tumor_content=tumor_sample.params['tumor_content']
     else:        
         estimated_tumor_content=config.DEFAULT_TUMOR_CONTENT
     logging.info("the estimated tumor content is %s",str(estimated_tumor_content))

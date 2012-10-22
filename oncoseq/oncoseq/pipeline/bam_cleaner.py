@@ -19,11 +19,10 @@ def markDuplicates(indexed_bam_file, outfile, picard_dir, tmp_dir, use_mem=2048)
     '''
     picard_command=os.path.join(picard_dir,'MarkDuplicates.jar')
     metrics_file=indexed_bam_file.replace('.bam','.duplicates.stats')
-    default_mem=2048
-    args=['java','-Xmx'+str(use_mem-default_mem)+'m',"-Djava.io.tmpdir=",tmp_dir,'-jar', picard_command, 
+    args=['java','-Xmx'+str(use_mem)+'m',"-Djava.io.tmpdir="+tmp_dir,'-jar', picard_command, 
           'I='+indexed_bam_file, 'O='+outfile, 'METRICS_FILE='+metrics_file,
           'ASSUME_SORTED=true','VALIDATION_STRINGENCY=SILENT',
-          'REMOVE_DUPLICATES=true',"TMP_DIR=",tmp_dir
+          'REMOVE_DUPLICATES=true',"TMP_DIR="+tmp_dir
           ]
     
     cmd = ",".join(args).replace(',',' ').replace(';',',')
@@ -38,14 +37,13 @@ def sortIndexSam(input_sam_file, output_bam_file,
     SO=SortOrder Sort order of output file  Required. Possible values: {unsorted, queryname, coordinate} 
     '''
     picard_command = os.path.join(picard_dir,"SortSam.jar")
-    default_mem=2048
-    args = ['java', '-Xmx'+str(use_mem-default_mem)+'m', "-Djava.io.tmpdir=",tmp_dir,'-jar', picard_command, 
+    args = ['java', '-Xmx'+str(use_mem)+'m', "-Djava.io.tmpdir="+tmp_dir,'-jar', picard_command, 
             'I=%s' % (input_sam_file), 
             'O=%s' % (output_bam_file),
             'SORT_ORDER=%s' % (sort_order),
             'CREATE_INDEX=true',
             'VALIDATION_STRINGENCY=SILENT',
-            "TMP_DIR=",tmp_dir]
+            "TMP_DIR="+tmp_dir]
     
     cmd = ",".join(args).replace(',',' ').replace(';',',')
     return cmd

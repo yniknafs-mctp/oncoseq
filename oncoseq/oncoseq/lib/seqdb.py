@@ -392,6 +392,7 @@ class SeqDB(object):
             p = Patient(**field_dict)
             # ensure unique ids
             if p.id in patients:
+                #print p.id
                 raise SeqDBError("Found duplicate patient id %s" % (p.id))
             patients[p.id] = p
         # read sample parameters

@@ -42,14 +42,13 @@ def call_snps(ref_fa, tumor_bam_file,
     #f=open(snps_vcf_file,'w')
     #f.close()
     args=["java","-jar",os.path.join(varscan_dir,"varscan"),"mpileup2snp", mpileup_t,
-          snps_vcf_file_tmp,
           "--variants",str(1),
           "--p-value",str(dpval),
-          "--output-vcf", str(1)]
-    
-    args = ",".join(args).replace(',',' ')
+          "--output-vcf", str(0)]    
     print args
-    retcode = subprocess.call(args, shell=True)
+    f = open(snps_vcf_file_tmp, "w")    
+    retcode = subprocess.call(args,stdout=f)
+    f.close()
     
     if retcode != 0:
         logging.error("varscan SNV calling failed")
@@ -58,15 +57,15 @@ def call_snps(ref_fa, tumor_bam_file,
             return config.JOB_ERROR
     
     args=["java","-jar",os.path.join(varscan_dir,"varscan"),"mpileup2indel", mpileup_t,
-          indels_vcf_file,
           "--variants",str(1),
           "--p-value",str(dpval),
-          "--output-vcf", str(1)]
-    
-    args = ",".join(args).replace(',',' ')
+          "--output-vcf", str(0)]
+
     print args
-    retcode = subprocess.call(args, shell=True)
-    
+    f = open(indels_vcf_file, "w")    
+    retcode = subprocess.call(args,stdout=f)
+    f.close()
+        
     if retcode != 0:
         logging.error("varscan Indel calling failed")
         if os.path.exists(indels_vcf_file):
