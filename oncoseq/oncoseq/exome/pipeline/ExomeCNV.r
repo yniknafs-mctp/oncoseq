@@ -20,6 +20,7 @@
 
 suppressPackageStartupMessages(library(DNAcopy,quietly=TRUE));
 suppressPackageStartupMessages(library(ExomeCNV,quietly=TRUE));
+suppressPackageStartupMessages(library(Cairo,quietly=TRUE));
 library(methods); #OSX doesn't include this for Rscript for some reason
 
 ################################################################################
@@ -46,6 +47,13 @@ input.skip        = 1;
 coverage.cols     = c("probe","chr","probe_start","probe_end",
                       "targeted.base","sequenced.base","coverage",
                       "average.coverage","base.with..10.coverage");
+CairoFonts(
+  regular="Freesans:style=Regular",
+  bold="Freesans:style=Bold",
+  italic="Freesans:style=Italic",
+  bolditalic="Freesans:style=Bold Italic,BoldItalic",
+  symbol="Symbol"
+);
 
 ################################################################################
 #  SUBROUTINES                                                                 #
@@ -238,8 +246,7 @@ doCNV = function(normal,tumor,logR,read.length,tumor.content)
 }
 plot.CNV.default = function(output.fp,all.CNV,exon.CNV)
 {
-  #pdf(file = output.fp, width = plot.width, height = plot.height);
-  png(filename = output.fp, width = plot.width, height = plot.height);
+  CairoPNG(filename = output.fp, width = plot.width, height = plot.height);
   display.quantile = 1;
   
   do.plot.eCNV(all.CNV,
@@ -251,9 +258,8 @@ plot.CNV.default = function(output.fp,all.CNV,exon.CNV)
 }
 plot.CNV.fancy = function(output.fp,all.CNV,exon.CNV,plot.title)
 {
-  #pdf(file = output.fp, width = plot.width, height = plot.height);
-  #CairoPNG(filename = output.fp, width = plot.width, height = plot.height);
-  png(filename = output.fp, width = plot.width, height = plot.height);
+  CairoPNG(filename = output.fp, width = plot.width, height = plot.height);
+  #png(filename = output.fp, width = plot.width, height = plot.height);
   
   #defining colors dynamically
   max.cn = max(all.CNV$copy.number, na.rm = TRUE);
@@ -281,6 +287,7 @@ plot.CNV.fancy = function(output.fp,all.CNV,exon.CNV,plot.title)
       xlab = "Chromosome",
       ylab = expression(Log[2]~Copy~Number~Ratio),
       xaxs="i",
+      font=1,
       axes=FALSE,
       main=plot.title);
   
@@ -376,10 +383,11 @@ c(normal,tumor) := loadCoverage(normal.fp,tumor.fp);
 logR = calculate.logR(normal, tumor);
 c(probe.CNV, segment.CNV) := doCNV(normal, tumor, logR, read.length, tumor.content);
 
+save(list = ls(),file = rdata);
+
 plot.CNV.fancy(output.plot,segment.CNV,probe.CNV,plot.title);
 
 write.table(probe.CNV, file = output.CNV, sep = "\t",
             row.names = FALSE, quote = FALSE);
-save(list = ls(),file = rdata);
-        
+
 if(!silent){ printTime("end"); }
