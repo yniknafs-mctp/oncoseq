@@ -646,6 +646,7 @@ def run_library(library, genome, server, pipeline, num_processors,
         args = [sys.executable, os.path.join(_oncoseq_pipeline_dir, "bam_cleaner.py"),
                 "--picard-dir",pipeline.picard_dir,
                 "--tmp-dir",tmp_dir,
+                "--java-mem",(config.BAM_CLEANING_JOB_MEM - config.BUFFER_JOB_MEM),
                 library.merged_bam_file,
                 library.merged_cleaned_bam_file]       
         log_file = os.path.join(log_dir, "bam_cleaning.log")
@@ -656,11 +657,12 @@ def run_library(library, genome, server, pipeline, num_processors,
                                  node_memory=server.node_mem,
                                  pbs_script_lines=server.pbs_script_lines,
                                  working_dir=library.output_dir,
-                                 mem=config.CLEAN_BAM_JOB_MEM,
-                                 walltime=config.CLEAN_BAM_JOB_WALLTIME,
+                                 mem=config.BAM_CLEANING_JOB_MEM,
+                                 walltime=config.BAM_CLEANING_JOB_WALLTIME,
                                  deps=merge_bam_deps,
                                  stderr_filename=log_file)
         cleaning_dep = [job_id]
+    
     #
     # call snps
     #
