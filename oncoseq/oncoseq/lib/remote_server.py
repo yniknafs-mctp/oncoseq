@@ -46,16 +46,19 @@ def get_remote_file_size(remote_file, remote_address, username, port):
 #    res = p.communicate()[0]
 #    return bool(int(res.strip()))
 
-def test_file_exists(remote_file, remote_address, username, port):
+def test_file_exists(remote_file, remote_address, username, port): # OAB,username,
     command = 'test -s %s && echo 1' % (remote_file)
     args = map(str, ["ssh", "-p", port, remote_address, '%s' % (command)])
     logging.debug("\targs: %s" % (args))
     p = subprocess.Popen(args, stdout=subprocess.PIPE)
+    print ",".join(args).replace(',', ' ')
+    
     res = p.communicate()[0]
     exists = (res.strip() == "1")
+    print exists
     return exists
 
-def remote_walk(remote_dir, remote_address, username, port):
+def remote_walk(remote_dir, remote_address, port): #OAB, username
     command = 'find -P %s -printf "%%P,%%y,%%s\n"' % (remote_dir)
     args = map(str, ["ssh", "-p", port, remote_address, '%s' % (command)])
     logging.debug("\targs: %s" % (args))
@@ -70,6 +73,9 @@ def remote_walk(remote_dir, remote_address, username, port):
         fileinfo.append((filename, filetype, filesize))
     p.wait()
     return fileinfo
+
+
+
 
 def globus_copy_file(src, dst, remote_address, username, port):
     #

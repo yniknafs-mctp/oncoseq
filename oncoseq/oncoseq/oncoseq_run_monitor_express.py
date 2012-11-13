@@ -1,7 +1,7 @@
 '''
-Created on Aug 17, 2011
+Created on Nov 3, 2012
 
-@author: mkiyer
+@author: oabalbin
 '''
 import logging
 import argparse
@@ -10,7 +10,7 @@ import os
 
 from oncoseq.lib import rundb
 #from oncoseq.rnaseq.rnaseq_copy_remote import copy_remote
-from oncoseq.oncoseq_copy_remote import copy_remote
+from oncoseq.lib.copy_remote_files_express import copy_remote
 
 
 def monitor_jobs(db, config_file, server_name, output_dir, ssh_port, overwrite):
@@ -23,11 +23,17 @@ def monitor_jobs(db, config_file, server_name, output_dir, ssh_port, overwrite):
         if status == rundb.STATUS_DONE:
             continue
         logging.info("Monitoring analysis %s current status=%s" % (job_name,status))
+        # ssh_port=ssh_port,overwrite=overwrite
         success = copy_remote(output_dir, config_file, server_name, job_name,
-                              ssh_port=ssh_port, 
-                              overwrite=overwrite)
-        if success:
-            rundb.setstatus(db, job_name, rundb.STATUS_DONE)
+                              #ssh_port, 
+                              overwrite)
+        
+        # In this script you do not want to close conecction
+        # If a particular job did not finished.
+        #if success:
+        #    rundb.setstatus(db, job_name, rundb.STATUS_DONE)
+        if not success:
+            logging.error("Job %s missing 'analysis.xml' file, job might need to be re-started" % (job_name))
 
 def main():
     logging.basicConfig(level=logging.DEBUG,

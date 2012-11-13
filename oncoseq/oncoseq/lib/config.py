@@ -311,10 +311,11 @@ def attach_rnaseq_library_to_results(library, root_dir):
         
     # lane results
     for lane in library.lanes:
+        print lane.read1_file
         lane.output_dir = os.path.join(library.output_dir, lane.id)
         # FASTQ files
         lane.fastq_files = [lane.read1_file]
-        lane.copied_fastq_files = [os.path.join(lane.output_dir, READ1_FASTQ_FILE)]
+        lane.copied_fastq_files = [os.path.join(lane.output_dir, READ1_FASTQ_FILE)]    
         if lane.read2_file is not None:
             lane.fastq_files.append(lane.read2_file)
             lane.copied_fastq_files.append(os.path.join(lane.output_dir, READ2_FASTQ_FILE))
@@ -323,11 +324,15 @@ def attach_rnaseq_library_to_results(library, root_dir):
         lane.fastqc_report_files = []
         for readnum in xrange(len(lane.fastq_files)):
             # if there is a compression extension (.gz, .zip, etc) remove it
+            print lane.fastq_files
+            print lane.fastq_files[readnum], os.path.extsep
+            print os.path.basename(lane.fastq_files[readnum]).split(os.path.extsep), 
             fastq_exts = os.path.basename(lane.fastq_files[readnum]).split(os.path.extsep)
             fastq_prefix = os.path.extsep.join(fastq_exts[:2])
             fastqc_dir = os.path.join(lane.output_dir, "%s%s" % (fastq_prefix, FASTQC_DIR_EXTENSION))
             lane.fastqc_data_files.append(os.path.join(fastqc_dir, FASTQC_DATA_FILE))
             lane.fastqc_report_files.append(os.path.join(fastqc_dir, FASTQC_REPORT_FILE))
+        
         # Abundant SAM files
         lane.abundant_sam_files = []
         for readnum in xrange(len(lane.copied_fastq_files)):
@@ -435,7 +440,7 @@ def validate_patient_results(patient):
 class AnalysisConfig(object):
 
     @staticmethod
-    def from_xml(xmlfile):
+    def from_xml(xmlfile, move_from_remote=False):
         tree = etree.parse(xmlfile)        
         root = tree.getroot()
         c = AnalysisConfig()        

@@ -66,6 +66,10 @@ def _find_sequence_file(filename):
     newfile = os.path.splitext(filename)[0]
     if os.path.isfile(newfile):
         return newfile
+    else:
+        # Dangerous
+        newfile = filename.split("/")[-1]
+        return newfile
     return None
 
 class Patient(object):
@@ -256,6 +260,7 @@ class Library(object):
         for lane_elem in elem.findall("lane"):
             lane = Lane.from_xml(lane_elem)
             lane.library = lib
+            #print lane.library
             lib.lanes.append(lane)
         return lib
         
@@ -301,7 +306,7 @@ class Lane(object):
         for attrname in self.__fields__:
             if attrname in kwargs:
                 setattr(self, attrname, kwargs[attrname])
-        self.lane = self.lane   
+        self.lane = self.lane
         self.read1_file = _find_sequence_file(self.read1_file)
         self.read2_file = _find_sequence_file(self.read2_file)
         # relationships
