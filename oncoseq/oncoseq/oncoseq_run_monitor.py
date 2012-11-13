@@ -9,7 +9,9 @@ import sqlite3
 import os
 
 from oncoseq.lib import rundb
-from oncoseq.rnaseq.rnaseq_copy_remote import copy_remote
+#from oncoseq.rnaseq.rnaseq_copy_remote import copy_remote
+from oncoseq.oncoseq_copy_remote import copy_remote
+
 
 def monitor_jobs(db, config_file, server_name, output_dir, ssh_port, overwrite):
     conn = sqlite3.connect(db)
