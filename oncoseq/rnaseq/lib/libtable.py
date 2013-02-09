@@ -26,7 +26,7 @@ import xlrd
 import xml.etree.cElementTree as etree
 import collections
 
-from assemblyline.rnaseq.lib.base import indent_xml
+from oncoseq.rnaseq.lib.base import indent_xml
 
 # fragment layouts
 FRAGMENT_LAYOUT_SINGLE = "single"
