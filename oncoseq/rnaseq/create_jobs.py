@@ -829,6 +829,7 @@ def create_job(library, pipeline, server, config_xml_file,
                 "--buildver", genome_static.annovar_buildver,
                 "--filter",
                 "--dbtype", genome_static.annovar_cosmicver,
+                "--outfile", results.annovar_output_prefix,
                 results.annovar_input_file,
                 genome_static.annovar_db,
                 '> %s 2>&1' % (log_file)]
