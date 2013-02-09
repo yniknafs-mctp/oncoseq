@@ -29,7 +29,7 @@ def main():
     if not os.path.exists(config_xml_file):
         logging.error("Configuration xml file not found")
         return config.JOB_ERROR
-    pipeline = config.PipelineConfig.from_xml(args.config_xml_file)
+    pipeline = config.PipelineConfig.from_xml(config_xml_file)
     results = config.RnaseqResults(library, pipeline, args.output_dir)
     valid, missing_files = results.validate()
     if not valid:
