@@ -11,9 +11,9 @@ import sys
 import pysam
 
 # project imports
-import assemblyline.rnaseq.lib.config as config
-from assemblyline.rnaseq.lib.libtable import FRAGMENT_LAYOUT_PAIRED
-from assemblyline.rnaseq.lib.inspect import inspect_sr_sam, inspect_pe_sam, RnaseqLibraryMetrics
+import oncoseq.rnaseq.lib.config as config
+from oncoseq.rnaseq.lib.libtable import FRAGMENT_LAYOUT_PAIRED
+from oncoseq.rnaseq.lib.inspect import inspect_sr_sam, inspect_pe_sam, RnaseqLibraryMetrics
 
 def main():
     logging.basicConfig(level=logging.DEBUG,

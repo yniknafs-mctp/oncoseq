@@ -10,7 +10,7 @@ import sys
 import subprocess
 
 import pysam
-from assemblyline.rnaseq.lib.base import check_executable
+from oncoseq.rnaseq.lib.base import check_executable
 
 def main():
     # setup logging

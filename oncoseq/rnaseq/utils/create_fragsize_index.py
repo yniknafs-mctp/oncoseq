@@ -11,11 +11,11 @@ import subprocess
 
 # local imports
 import pysam
+from bx.intervals.intersection import Interval, IntervalTree
 
 # project imports
-from assemblyline.lib.bx.intersection import Interval, IntervalTree
-from assemblyline.lib.seq import DNA_reverse_complement
-from assemblyline.rnaseq.lib.base import split_seq
+from oncoseq.rnaseq.lib.seq import DNA_reverse_complement
+from oncoseq.rnaseq.lib.base import split_seq
 
 def parse_gtf_exons(f):
     for line in f:

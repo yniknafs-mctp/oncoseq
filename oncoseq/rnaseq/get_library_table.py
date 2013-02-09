@@ -8,10 +8,10 @@ import argparse
 import sys
 import os
 
-import assemblyline.rnaseq.lib.config as config
-import assemblyline.rnaseq.lib.picard as picard
-from assemblyline.rnaseq.lib.libtable import Library, read_library_table_xls
-from assemblyline.rnaseq.lib.base import get_fastqc_total_sequences
+import oncoseq.rnaseq.lib.config as config
+import oncoseq.rnaseq.lib.picard as picard
+from oncoseq.rnaseq.lib.libtable import Library, read_library_table_xls
+from oncoseq.rnaseq.lib.base import get_fastqc_total_sequences
 
 def main():
     logging.basicConfig(level=logging.DEBUG,

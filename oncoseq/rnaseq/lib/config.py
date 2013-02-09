@@ -9,11 +9,11 @@ import logging
 import collections
 import xml.etree.cElementTree as etree
 
-from assemblyline.rnaseq.lib.base import check_executable, check_sam_file, \
+from oncoseq.rnaseq.lib.base import check_executable, check_sam_file, \
     indent_xml, file_exists_and_nz_size, parse_bool, bool_to_yesno, \
     make_pe_files
-from assemblyline.rnaseq.lib.libtable import FRAGMENT_LAYOUT_PAIRED, FR_UNSTRANDED
-from assemblyline.rnaseq.lib.inspect import RnaseqLibraryMetrics
+from oncoseq.rnaseq.lib.libtable import FRAGMENT_LAYOUT_PAIRED, FR_UNSTRANDED
+from oncoseq.rnaseq.lib.inspect import RnaseqLibraryMetrics
 
 # default parameter values
 MIN_INSPECT_SAMPLES = 100

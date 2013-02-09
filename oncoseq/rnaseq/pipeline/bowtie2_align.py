@@ -9,9 +9,9 @@ import sys
 import os
 import subprocess
 
-from assemblyline.lib.base import check_executable
-import assemblyline.rnaseq.pipeline
-_pipeline_dir = assemblyline.rnaseq.pipeline.__path__[0]
+from oncoseq.rnaseq.lib.base import check_executable
+import oncoseq.rnaseq.pipeline
+_pipeline_dir = oncoseq.rnaseq.pipeline.__path__[0]
 
 def bowtie2_paired_align(bowtie2_index,
                          bam_file,

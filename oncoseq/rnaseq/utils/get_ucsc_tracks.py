@@ -10,13 +10,13 @@ import argparse
 import urllib
 
 # projects
-import assemblyline.rnaseq.lib.config as config
-from assemblyline.rnaseq.lib.libtable import Library
-from assemblyline.rnaseq.lib.inspect import RnaseqLibraryMetrics
-from assemblyline.rnaseq.lib.libtable import FR_UNSTRANDED
+import oncoseq.rnaseq.lib.config as config
+from oncoseq.rnaseq.lib.libtable import Library
+from oncoseq.rnaseq.lib.inspect import RnaseqLibraryMetrics
+from oncoseq.rnaseq.lib.libtable import FR_UNSTRANDED
 
-import assemblyline.rnaseq.pipeline
-_pipeline_dir = assemblyline.rnaseq.pipeline.__path__[0]
+import oncoseq.rnaseq.pipeline
+_pipeline_dir = oncoseq.rnaseq.pipeline.__path__[0]
 
 STRAND_COLOR_MAP = {".": "0,128,0",
                     "+": "255,0,0",

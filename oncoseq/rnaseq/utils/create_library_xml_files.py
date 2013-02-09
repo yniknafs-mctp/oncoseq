@@ -9,9 +9,9 @@ import argparse
 import logging
 import xml.etree.cElementTree as etree
 
-import assemblyline.rnaseq.lib.config as config 
-from assemblyline.rnaseq.lib.base import indent_xml
-from assemblyline.rnaseq.lib.libtable import read_library_table_xls
+import oncoseq.rnaseq.lib.config as config 
+from oncoseq.rnaseq.lib.base import indent_xml
+from oncoseq.rnaseq.lib.libtable import read_library_table_xls
 
 def main():
     logging.basicConfig(level=logging.DEBUG,

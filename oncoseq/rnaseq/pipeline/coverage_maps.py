@@ -11,11 +11,11 @@ import subprocess
 
 import pysam
 
-import assemblyline.rnaseq.lib.picard as picard
-from assemblyline.rnaseq.lib.config import STRAND_SUFFIX_DICT
-from assemblyline.rnaseq.lib.base import check_executable
-from assemblyline.rnaseq.lib.libtable import FR_UNSTRANDED
-from assemblyline.rnaseq.lib.inspect import RnaseqLibraryMetrics
+import oncoseq.rnaseq.lib.picard as picard
+from oncoseq.rnaseq.lib.config import STRAND_SUFFIX_DICT
+from oncoseq.rnaseq.lib.base import check_executable
+from oncoseq.rnaseq.lib.libtable import FR_UNSTRANDED
+from oncoseq.rnaseq.lib.inspect import RnaseqLibraryMetrics
 
 def make_coverage_map(bam_file, bigwig_file, scale_factor, 
                       chrom_sizes_file, tmp_dir):

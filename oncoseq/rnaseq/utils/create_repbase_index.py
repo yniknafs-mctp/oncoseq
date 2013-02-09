@@ -8,8 +8,6 @@ import argparse
 import sys
 import subprocess
 
-from assemblyline.rnaseq.lib.base import split_seq
-
 def expand_ambiguous_bases(seq):
     """
     A     A     Adenosine     T     B

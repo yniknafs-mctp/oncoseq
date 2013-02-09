@@ -12,7 +12,7 @@ import array
 # local import
 import pysam
 # project imports
-import assemblyline.rnaseq.lib.config as config
+import oncoseq.rnaseq.lib.config as config
 
 def main():
     logging.basicConfig(level=logging.DEBUG,

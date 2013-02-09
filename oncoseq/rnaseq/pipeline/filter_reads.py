@@ -10,12 +10,12 @@ import sys
 import subprocess
 
 # project imports
-from assemblyline.rnaseq.lib.base import BOWTIE2_QUAL_MAP, \
+from oncoseq.rnaseq.lib.base import BOWTIE2_QUAL_MAP, \
     file_exists_and_nz_size, get_fastqc_encoding, \
     ENCODING_TO_QUAL_FORMAT, check_executable
-import assemblyline.rnaseq.lib.config as config
-import assemblyline.rnaseq.pipeline
-_pipeline_dir = assemblyline.rnaseq.pipeline.__path__[0]
+import oncoseq.rnaseq.lib.config as config
+import oncoseq.rnaseq.pipeline
+_pipeline_dir = oncoseq.rnaseq.pipeline.__path__[0]
 
 def get_quality_score_encoding(fastqc_data_files):
     # get fastq format from fastqc output

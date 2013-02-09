@@ -10,11 +10,11 @@ import argparse
 import subprocess
 import shutil
 
-import assemblyline.rnaseq.lib.config as config
-from assemblyline.rnaseq.lib.base import detect_format
-from assemblyline.rnaseq.lib.libtable import Library, read_library_table_xls, FRAGMENT_LAYOUT_PAIRED
-import assemblyline.rnaseq.pipeline
-_pipeline_dir = assemblyline.rnaseq.pipeline.__path__[0]
+import oncoseq.rnaseq.lib.config as config
+from oncoseq.rnaseq.lib.base import detect_format
+from oncoseq.rnaseq.lib.libtable import Library, read_library_table_xls, FRAGMENT_LAYOUT_PAIRED
+import oncoseq.rnaseq.pipeline
+_pipeline_dir = oncoseq.rnaseq.pipeline.__path__[0]
 
 def bash_log(msg, level="DEBUG"):
     return 'echo "[`date`] - %s - %s" >&2' % (level, msg)
@@ -932,7 +932,7 @@ def main():
         level = logging.INFO
     logging.basicConfig(level=level,
                         format="%(asctime)s - %(name)s - %(levelname)s - %(message)s")
-    logging.info("Assemblyline version %s" % (assemblyline.__version__))
+    logging.info("Oncoseq version %s" % (oncoseq.__version__))
     logging.info("=============================")
     #
     # read and validate configuration file

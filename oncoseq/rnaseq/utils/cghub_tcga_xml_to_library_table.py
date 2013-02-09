@@ -9,10 +9,10 @@ import logging
 import argparse
 import xml.etree.cElementTree as etree
 
-from assemblyline.rnaseq.lib.libtable import Library, \
+from oncoseq.rnaseq.lib.libtable import Library, \
     FRAGMENT_LAYOUT_SINGLE, FRAGMENT_LAYOUT_PAIRED, \
     POLYA_TRANSCRIPTOME, FR_UNSTRANDED
-from assemblyline.rnaseq.lib.base import indent_xml
+from oncoseq.rnaseq.lib.base import indent_xml
 
 def main():
     logging.basicConfig(level=logging.DEBUG,

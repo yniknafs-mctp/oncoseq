@@ -26,8 +26,8 @@ import os
 import logging
 import argparse
 
-import assemblyline.rnaseq.pipeline
-_pipeline_dir = assemblyline.rnaseq.pipeline.__path__[0]
+import oncoseq.rnaseq.pipeline
+_pipeline_dir = oncoseq.rnaseq.pipeline.__path__[0]
 
 def run_htseq_count(gtf_file, bam_file, output_file, run_as_pe, 
                     is_sorted, extra_args, tmp_dir):

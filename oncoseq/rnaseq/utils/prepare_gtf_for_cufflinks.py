@@ -3,13 +3,12 @@ Created on Dec 5, 2012
 
 @author: mkiyer
 '''
-import os
 import sys
 import logging
 import argparse
 import subprocess
 
-from assemblyline.lib.gtf import GTFFeature, sort_gtf
+from oncoseq.rnaseq.lib.gtf import GTFFeature, sort_gtf
 
 def main():
     logging.basicConfig(level=logging.DEBUG,

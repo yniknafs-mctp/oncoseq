@@ -15,12 +15,12 @@ import os
 import subprocess
 
 # project imports
-from assemblyline.rnaseq.lib.inspect import RnaseqLibraryMetrics
-from assemblyline.rnaseq.lib.libtable import FRAGMENT_LAYOUT_PAIRED, FRAGMENT_LAYOUT_SINGLE
-import assemblyline.rnaseq.lib.config as config
+from oncoseq.rnaseq.lib.inspect import RnaseqLibraryMetrics
+from oncoseq.rnaseq.lib.libtable import FRAGMENT_LAYOUT_PAIRED, FRAGMENT_LAYOUT_SINGLE
+import oncoseq.rnaseq.lib.config as config
 
-import assemblyline.rnaseq.pipeline
-_pipeline_dir = assemblyline.rnaseq.pipeline.__path__[0]
+import oncoseq.rnaseq.pipeline
+_pipeline_dir = oncoseq.rnaseq.pipeline.__path__[0]
 
 def inspect_rnaseq_library(bowtie_index,
                            result_file,

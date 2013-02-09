@@ -9,7 +9,7 @@ import argparse
 import logging
 import subprocess
 
-from assemblyline.rnaseq.lib.inspect import RnaseqLibraryMetrics
+from oncoseq.rnaseq.lib.inspect import RnaseqLibraryMetrics
 
 def get_picard_strand_specificity(library_type):
     if library_type == "fr-firststrand":

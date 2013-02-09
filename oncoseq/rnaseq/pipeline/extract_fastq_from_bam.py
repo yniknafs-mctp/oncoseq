@@ -11,9 +11,9 @@ import subprocess
 
 import pysam
 
-from assemblyline.rnaseq.lib.base import DNA_reverse_complement, parse_sam, remove_multihits
-import assemblyline.rnaseq.pipeline
-_pipeline_dir = assemblyline.rnaseq.pipeline.__path__[0]
+from oncoseq.rnaseq.lib.base import DNA_reverse_complement, parse_sam, remove_multihits
+import oncoseq.rnaseq.pipeline
+_pipeline_dir = oncoseq.rnaseq.pipeline.__path__[0]
 
 def to_fastq(r, readnum):
     seq = DNA_reverse_complement(r.seq) if r.is_reverse else r.seq

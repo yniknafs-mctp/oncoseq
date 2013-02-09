@@ -8,8 +8,8 @@ import argparse
 import sys
 import os
 
-import assemblyline.rnaseq.lib.config as config
-from assemblyline.rnaseq.lib.libtable import Library
+import oncoseq.rnaseq.lib.config as config
+from oncoseq.rnaseq.lib.libtable import Library
 
 def main():
     logging.basicConfig(level=logging.DEBUG,

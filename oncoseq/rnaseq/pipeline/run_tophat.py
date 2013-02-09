@@ -9,8 +9,8 @@ import subprocess
 import sys
 
 # project imports
-from assemblyline.rnaseq.lib.inspect import RnaseqLibraryMetrics
-from assemblyline.rnaseq.lib.base import detect_read_length
+from oncoseq.rnaseq.lib.inspect import RnaseqLibraryMetrics
+from oncoseq.rnaseq.lib.base import detect_read_length
 
 def run_tophat(output_dir, fastq_files, library_metrics_file,
                bowtie_index, num_processors,

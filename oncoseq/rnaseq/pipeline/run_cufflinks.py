@@ -9,7 +9,7 @@ import subprocess
 import sys
 import os
 
-from assemblyline.rnaseq.lib.inspect import RnaseqLibraryMetrics
+from oncoseq.rnaseq.lib.inspect import RnaseqLibraryMetrics
 
 def run_cufflinks(bam_file,
                   library_metrics_file,

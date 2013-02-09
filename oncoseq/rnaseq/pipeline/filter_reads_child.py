@@ -13,7 +13,7 @@ import array
 import pysam
 
 # project imports
-from assemblyline.rnaseq.lib.base import parse_sam, \
+from oncoseq.rnaseq.lib.base import parse_sam, \
     remove_multihits, to_fastq
 
 def main():
