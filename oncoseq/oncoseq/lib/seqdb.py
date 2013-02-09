@@ -444,7 +444,6 @@ class SeqDB(object):
         sample_groups = {}
         for field_dict in read_wksheet(wkbook.sheet_by_name("groups")):
             grp = SampleGroup(**field_dict)
-            print grp.patient_id
             p = patients[grp.patient_id]
             p.sample_groups[grp.id] = grp
             grp.patient = p

@@ -8,6 +8,7 @@ SANGER_ENCODING = "Sanger / Illumina 1.9"
 SOLEXA_ENCODING = "Illumina < 1.3"
 ILLUMINA_13_ENCODING = "Illumina 1.3"
 ILLUMINA_15_ENCODING = "Illumina 1.5"
+
 ENCODING_VALUES = (SANGER_ENCODING, 
                    SOLEXA_ENCODING, 
                    ILLUMINA_13_ENCODING, 
