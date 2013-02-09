@@ -835,6 +835,8 @@ def create_job(library, pipeline, server, config_xml_file,
         command = ' '.join(map(str, args))
         shell_commands.append(command)
         shell_commands.append(bash_check_retcode())
+        # remove useless intermediate files
+        shell_commands.extend(bash_remove_files([results.annovar_cosmic_filtered_file]))
     #
     # write job finished file
     #

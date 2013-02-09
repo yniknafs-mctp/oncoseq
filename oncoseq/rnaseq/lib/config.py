@@ -69,15 +69,6 @@ TOPHAT_FUSION_DIR = 'tophatfusion'
 TOPHAT_FUSION_BAM_FILE = os.path.join(TOPHAT_FUSION_DIR, "accepted_hits.bam")
 TOPHAT_FUSION_BAM_INDEX_FILE = TOPHAT_FUSION_BAM_FILE + ".bai"
 TOPHAT_FUSION_FILE = os.path.join(TOPHAT_FUSION_DIR, "fusions.out")
-#TOPHAT_FUSION_READS_BAM_FILE = "fusion_hits.bam"
-#TOPHAT_FUSION_READS_BAM_INDEX_FILE = TOPHAT_FUSION_READS_BAM_FILE + ".bai"
-#TOPHAT_FUSION_TMP_FILES = ("accepted_hits.bam",
-#                           "accepted_hits.bam.bai",
-#                           "deletions.bed",
-#                           "insertions.bed",
-#                           "junctions.bed",
-#                           "tmp",
-#                           "unmapped.bam")
 TOPHAT_FUSION_POST_RESULT_FILE = os.path.join(TOPHAT_FUSION_DIR, 'result.txt')
 TOPHAT_FUSION_POST_HTML_FILE = os.path.join(TOPHAT_FUSION_DIR, 'result.html')
 TOPHAT_FUSION_POST_TMP_FILES = (os.path.join(TOPHAT_FUSION_DIR, f) 
@@ -120,7 +111,8 @@ ANNOVAR_INPUT_FILE = "annovar_input.txt"
 ANNOVAR_OUTPUT_PREFIX = "annovar"
 ANNOVAR_EXOME_SUMMARY_FILE = "annovar.exome_summary.csv"
 ANNOVAR_GENOME_SUMMARY_FILE = "annovar.genome_summary.csv"
-ANNOVAR_COSMIC_FILE_FUNC = lambda p, bv, cv: "%s.%s_%s_dropped" % (p, bv, cv)
+ANNOVAR_COSMIC_DROPPED_FILE_FUNC = lambda p, bv, cv: "%s.%s_%s_dropped" % (p, bv, cv)
+ANNOVAR_COSMIC_FILTERED_FILE_FUNC = lambda p, bv, cv: "%s.%s_%s_filtered" % (p, bv, cv)
 # job complete
 JOB_DONE_FILE = "job.done"
 # job memory and runtime
@@ -286,14 +278,9 @@ class RnaseqResults(object):
         self.tophat_fusion_bam_file = os.path.join(self.output_dir, TOPHAT_FUSION_BAM_FILE)        
         self.tophat_fusion_bam_index_file = os.path.join(self.output_dir, TOPHAT_FUSION_BAM_INDEX_FILE)
         self.tophat_fusion_file = os.path.join(self.output_dir, TOPHAT_FUSION_FILE)
-        #self.tophat_fusion_reads_bam_file = os.path.join(self.tophat_fusion_dir, TOPHAT_FUSION_READS_BAM_FILE)        
-        #self.tophat_fusion_reads_bam_index_file = os.path.join(self.output_dir, TOPHAT_FUSION_READS_BAM_INDEX_FILE)
-        #self.tophat_fusion_tmp_files = (os.path.join(self.tophat_fusion_dir, f) for f in TOPHAT_FUSION_TMP_FILES)
         self.tophat_fusion_post_result_file = os.path.join(self.output_dir, TOPHAT_FUSION_POST_RESULT_FILE)
-        self.tophat_fusion_post_tmp_files = (os.path.join(self.output_dir, f) for f in TOPHAT_FUSION_POST_TMP_FILES)
-        # TODO: only for rnaseq_df1
-        self.cufflinks_dir = os.path.join(self.output_dir, CUFFLINKS_DEPRECATED_DIR)
-        self.cufflinks_gtf_file = os.path.join(self.cufflinks_dir, CUFFLINKS_TRANSCRIPTS_GTF_FILE)
+        self.tophat_fusion_post_tmp_files = [os.path.join(self.output_dir, f) 
+                                             for f in TOPHAT_FUSION_POST_TMP_FILES]
         # cufflinks ab initio output files
         self.cufflinks_ab_initio_dir = os.path.join(self.output_dir, CUFFLINKS_AB_INITIO_DIR)
         self.cufflinks_ab_initio_gtf_file = os.path.join(self.cufflinks_ab_initio_dir, CUFFLINKS_TRANSCRIPTS_GTF_FILE)
@@ -315,10 +302,14 @@ class RnaseqResults(object):
         self.annovar_output_prefix = os.path.join(self.output_dir, ANNOVAR_OUTPUT_PREFIX)
         self.annovar_genome_summary_file = os.path.join(self.output_dir, ANNOVAR_GENOME_SUMMARY_FILE)
         genome_local = pipeline.genomes[library.species]
-        annovar_cosmic_file = ANNOVAR_COSMIC_FILE_FUNC(ANNOVAR_OUTPUT_PREFIX,
-                                                       genome_local.annovar_buildver,
-                                                       genome_local.annovar_cosmicver)
-        self.annovar_cosmic_file = os.path.join(self.output_dir, annovar_cosmic_file)
+        dropped_file = ANNOVAR_COSMIC_DROPPED_FILE_FUNC(ANNOVAR_OUTPUT_PREFIX,
+                                                        genome_local.annovar_buildver,
+                                                        genome_local.annovar_cosmicver)
+        filtered_file = ANNOVAR_COSMIC_FILTERED_FILE_FUNC(ANNOVAR_OUTPUT_PREFIX,
+                                                          genome_local.annovar_buildver,
+                                                          genome_local.annovar_cosmicver)
+        self.annovar_cosmic_dropped_file = os.path.join(self.output_dir, dropped_file)
+        self.annovar_cosmic_filtered_file = os.path.join(self.output_dir, filtered_file)
         # job finished file
         self.job_done_file = os.path.join(self.output_dir, JOB_DONE_FILE)
         self.pbs_stdout_file = os.path.join(self.log_dir, PBS_STDOUT_FILE)
@@ -457,16 +448,6 @@ class RnaseqResults(object):
                 logging.error("Library %s missing/corrupt tophat fusion file" % (self.library_id))
                 missing_files.append(self.tophat_fusion_file)
                 is_valid = False
-#            # check tophat fusion reads bam file
-#            if not check_sam_file(self.tophat_fusion_reads_bam_file, isbam=True):
-#                logging.error("Library %s missing/corrupt tophat fusion reads BAM file" % (self.library_id))
-#                missing_files.append(self.tophat_fusion_reads_bam_file)
-#                is_valid = False
-#            # check tophat fusion reads bam index file
-#            if not file_exists_and_nz_size(self.tophat_fusion_reads_bam_index_file):
-#                logging.error("Library %s missing tophat fusion reads BAM index" % (self.library_id))
-#                missing_files.append(self.tophat_fusion_reads_bam_index_file)
-#                is_valid = False
             # check tophat fusion post result file
             if config.tophat_fusion_post_run:
                 if not os.path.exists(self.tophat_fusion_post_result_file):
@@ -516,9 +497,9 @@ class RnaseqResults(object):
                     logging.error("Library %s missing annovar genome summary csv file" % (self.library_id))
                     missing_files.append(self.annovar_genome_summary_file)
                     is_valid = False
-                if not os.path.exists(self.annovar_cosmic_file):
+                if not os.path.exists(self.annovar_cosmic_dropped_file):
                     logging.error("Library %s missing annovar cosmic file" % (self.library_id))
-                    missing_files.append(self.annovar_cosmic_file)
+                    missing_files.append(self.annovar_cosmic_dropped_file)
                     is_valid = False
         return is_valid, missing_files
 
