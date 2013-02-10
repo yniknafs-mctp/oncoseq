@@ -900,6 +900,9 @@ def main():
     parser.add_argument("-p", type=int, dest="num_processors", 
                         default=1,
                         help="Number of processors per job")
+    parser.add_argument("-o", "--output-dir", dest="output_dir", 
+                        default=None, help="Overwrite output directory "
+                        "specified in config xml file")
     parser.add_argument("--keep-tmp", dest="keep_tmp", 
                         action="store_true", default=False,
                         help="Retain intermediate files generated during "
@@ -944,6 +947,15 @@ def main():
                      (args.config_xml_file))
     logging.info("Reading pipeline configuration file")
     pipeline = config.PipelineConfig.from_xml(args.config_xml_file)
+    # overwrite output directory
+    if args.output_dir is not None:
+        if ((not os.path.exists(args.output_dir)) or 
+            (not os.path.isdir(args.output_dir))):
+            parser.error("Output directory '%s' not valid" % (args.output_dir))
+        if args.server_name not in pipeline.servers:
+            parser.error("Server name '%s' not found" % (args.server_name))
+        server = pipeline.servers[args.server_name]
+        server.output_dir = args.output_dir
     if not pipeline.is_valid(args.server_name):
         logging.error("Pipeline config not valid")
         return config.JOB_ERROR

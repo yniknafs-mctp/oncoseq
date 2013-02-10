@@ -27,6 +27,8 @@ LIBRARY_XML_FILE = "library.xml"
 CONFIG_XML_FILE = "config.xml"
 # fastq file names
 FASTQ_FILES = make_pe_files('read','.fq')
+# bam file prefix
+BAM_FILE_PREFIX = "bam_file"
 # fastqc
 FASTQC_DIR_EXTENSION = "_fastqc"
 FASTQC_DATA_FILE = "fastqc_data.txt"
@@ -212,7 +214,7 @@ class RnaseqResults(object):
         self.bam_read1_files = []
         self.bam_read2_files = []
         for i in xrange(1,len(library.bam_files)+1):
-            prefix = os.path.join(self.tmp_dir, "bam_file%03d" % (i))
+            prefix = os.path.join(self.tmp_dir, "%s%03d" % (BAM_FILE_PREFIX, i))
             self.bam_fastq_prefixes.append(prefix)
             if library.fragment_layout == FRAGMENT_LAYOUT_PAIRED:        
                 self.bam_read1_files.append("%s.paired.1.fq" % (prefix))
