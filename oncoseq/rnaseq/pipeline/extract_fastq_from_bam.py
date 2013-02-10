@@ -11,16 +11,13 @@ import subprocess
 
 import pysam
 
-from oncoseq.rnaseq.lib.base import DNA_reverse_complement, parse_sam, remove_multihits
+from oncoseq.rnaseq.lib.base import parse_sam, remove_multihits, to_fastq_sr, to_fastq
+from oncoseq.rnaseq.lib.libtable import FRAGMENT_LAYOUT_SINGLE, FRAGMENT_LAYOUT_PAIRED
 import oncoseq.rnaseq.pipeline
 _pipeline_dir = oncoseq.rnaseq.pipeline.__path__[0]
 
-def to_fastq(r, readnum):
-    seq = DNA_reverse_complement(r.seq) if r.is_reverse else r.seq
-    qual = r.qual[::-1] if r.is_reverse else r.qual 
-    return "@%s/%d\n%s\n+\n%s" % (r.qname, readnum+1, seq, qual)
 
-def bam_to_fastq(bam_file, fastq_prefix, assume_sorted, has_unpaired,
+def bam_to_fastq(bam_file, fastq_prefix, assume_sorted, 
                  readnum_in_qname, tmp_dir): 
     # get sort order of bam file
     sort_order = None
@@ -79,7 +76,7 @@ def bam_to_fastq(bam_file, fastq_prefix, assume_sorted, has_unpaired,
             print >>paired_fhs[0], to_fastq(r1, 0)
             print >>paired_fhs[1], to_fastq(r2, 1)
             paired_counts += 1
-        elif has_unpaired:
+        else:
             if (r1 is not None):
                 # unpaired read 1
                 print >>unpaired_fhs[0], to_fastq(r1, 0)
@@ -88,8 +85,6 @@ def bam_to_fastq(bam_file, fastq_prefix, assume_sorted, has_unpaired,
                 # unpaired read 2
                 print >>unpaired_fhs[1], to_fastq(r2, 1)
                 unpaired_counts[1] += 1
-        else:
-            raise Exception("Unpaired reads found when has_unpaired=False")
     bamfh.close()
     logging.debug("found %d paired reads" % (paired_counts))
     logging.debug("found %d unpaired read1" % (unpaired_counts[0]))
@@ -113,11 +108,6 @@ def main():
                         action="store_true", default=False)
     parser.add_argument('--readnum-in-qname', dest="readnum_in_qname", 
                         action="store_true", default=False)
-    parser.add_argument('--no-unpaired', dest="has_unpaired", 
-                        action="store_false", default=True,
-                        help="set to true if you are sure there are no "
-                        "unpaired reads in the bam file. this makes error "
-                        "checking more stringent")
     parser.add_argument('--tmp-dir', dest="tmp_dir", default="/tmp")
     parser.add_argument('bam_file')
     parser.add_argument('fastq_prefix')
@@ -130,7 +120,6 @@ def main():
     return bam_to_fastq(args.bam_file, 
                         args.fastq_prefix, 
                         args.assume_sorted,
-                        args.has_unpaired,
                         args.readnum_in_qname,
                         tmp_dir)
 

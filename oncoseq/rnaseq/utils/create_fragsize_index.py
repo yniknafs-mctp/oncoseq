@@ -14,8 +14,7 @@ import pysam
 from bx.intervals.intersection import Interval, IntervalTree
 
 # project imports
-from oncoseq.rnaseq.lib.seq import DNA_reverse_complement
-from oncoseq.rnaseq.lib.base import split_seq
+from oncoseq.rnaseq.lib.base import DNA_reverse_complement, split_seq
 
 def parse_gtf_exons(f):
     for line in f:

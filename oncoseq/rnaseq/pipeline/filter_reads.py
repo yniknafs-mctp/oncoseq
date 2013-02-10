@@ -69,10 +69,16 @@ def filter_reads(bowtie2_index,
     unsorted_bam_file = os.path.join(tmp_dir, prefix + ".unsorted.bam") 
     args = ["python", os.path.join(_pipeline_dir, "filter_reads_child.py"),
             "-", unsorted_bam_file, counts_file, ','.join(output_files)]
-    retcode1 = subprocess.call(args, stdin=aln_p.stdout)
-    retcode2 = aln_p.wait()
-    if retcode1 + retcode2 > 0:
+    retcode = subprocess.call(args, stdin=aln_p.stdout)
+    if retcode != 0:
         logging.error("filter_reads_child.py failed with error code %d" % (retcode))
+        aln_p.terminate()
+        if os.path.exists(unsorted_bam_file):
+            os.remove(unsorted_bam_file)
+        return 1
+    retcode = aln_p.wait()
+    if retcode != 0:
+        logging.error("bowtie2 alignment failed with error code %d" % (retcode))
         if os.path.exists(unsorted_bam_file):
             os.remove(unsorted_bam_file)
         return 1

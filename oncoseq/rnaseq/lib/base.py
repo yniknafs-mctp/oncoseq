@@ -187,13 +187,13 @@ def check_sam_file(filename, isbam=False):
             is_valid = False
     return is_valid
 
-def parse_reads_by_qname(samfh):
+def parse_sr_reads(samfh):
     """
     generator function to parse and return lists of
     reads that share the same qname
     """    
     reads = []
-    for read in samfh:        
+    for read in samfh:
         if len(reads) > 0 and read.qname != reads[-1].qname:
             yield reads
             reads = []
@@ -223,7 +223,7 @@ def parse_pe_reads(bamfh):
     if num_reads > 0:
         yield pe_reads
 
-def parse_sam(sam_iter, readnum_in_qname, remove_suffix):
+def parse_sam(sam_iter, readnum_in_qname=False, remove_suffix=False):
     '''
     reads must be sorted by queryname 
     '''
@@ -240,7 +240,7 @@ def parse_sam(sam_iter, readnum_in_qname, remove_suffix):
             elif (suffix == "/2"):
                 readnum = 1
             else:
-                raise Exception("suffix /1 or /2 not found in qname")
+                readnum = 0
         else:
             readnum = 1 if r.is_read2 else 0
         # optionally remove the /1 or /2 suffix
@@ -267,6 +267,11 @@ def remove_multihits(pe_reads):
     if len(pe_reads[1]) > 0:
         r2 = pe_reads[1][0]
     return r1,r2
+
+def to_fastq_sr(r):
+    seq = DNA_reverse_complement(r.seq) if r.is_reverse else r.seq
+    qual = r.qual[::-1] if r.is_reverse else r.qual 
+    return "@%s\n%s\n+\n%s" % (r.qname, seq, qual)
 
 def to_fastq(r, readnum):
     seq = DNA_reverse_complement(r.seq) if r.is_reverse else r.seq
