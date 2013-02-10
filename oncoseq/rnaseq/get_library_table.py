@@ -10,8 +10,8 @@ import os
 
 import oncoseq.rnaseq.lib.config as config
 import oncoseq.rnaseq.lib.picard as picard
+import oncoseq.rnaseq.lib.fastqc as fastqc
 from oncoseq.rnaseq.lib.libtable import Library, read_library_table_xls
-from oncoseq.rnaseq.lib.base import get_fastqc_total_sequences
 
 RESULT_HEADER_FIELDS = ["total_fragments",
                         "total_aligned_reads", 
@@ -78,7 +78,7 @@ def main():
             fields.extend(['na'] * len(RESULT_HEADER_FIELDS))
         else:
             if os.path.exists(results.fastqc_data_files[0]):
-                total_frags = get_fastqc_total_sequences(results.fastqc_data_files[0])
+                total_frags = fastqc.get_total_sequences(results.fastqc_data_files[0])
                 fields.append(total_frags)
             else:
                 fields.append('na')

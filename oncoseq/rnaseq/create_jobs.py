@@ -368,8 +368,9 @@ def create_job(library, pipeline, server, config_xml_file,
             args.append('--tophat-arg="%s"' % genome_static.resolve_arg(arg))
         args.extend([results.tophat_fusion_dir,
                      genome_static.genome_bowtie1_index,
-                     results.library_metrics_file])
-        args.extend(results.filtered_fastq_files)
+                     results.library_metrics_file,
+                     ','.join(results.fastqc_data_files),
+                     ','.join(results.filtered_fastq_files)])
         logging.debug("\targs: %s" % (' '.join(map(str, args))))
         command = ' '.join(map(str, args))
         log_file = os.path.join(results.log_dir, 'tophat_fusion.log')
@@ -432,8 +433,9 @@ def create_job(library, pipeline, server, config_xml_file,
         args.append('--tophat-arg="%s"' % genome_static.resolve_arg(arg))
     args.extend([results.tophat_dir,
                  genome_static.genome_bowtie2_index,
-                 results.library_metrics_file])
-    args.extend(results.filtered_fastq_files)
+                 results.library_metrics_file,
+                 ','.join(results.fastqc_data_files),
+                 ','.join(results.filtered_fastq_files)])
     logging.debug("\targs: %s" % (' '.join(map(str, args))))
     command = ' '.join(map(str, args))
     log_file = os.path.join(results.log_dir, 'tophat.log')
@@ -940,7 +942,7 @@ def main():
     logging.info("Oncoseq version %s" % (oncoseq.__version__))
     logging.info("=============================")
     #
-    # read and validate configuration file
+    # read configuration file
     #
     if not os.path.exists(args.config_xml_file):
         parser.error("Configuration XML file %s not found" % 
@@ -954,8 +956,10 @@ def main():
             parser.error("Output directory '%s' not valid" % (args.output_dir))
         if args.server_name not in pipeline.servers:
             parser.error("Server name '%s' not found" % (args.server_name))
+        output_dir = os.path.abspath(args.output_dir)
         server = pipeline.servers[args.server_name]
-        server.output_dir = args.output_dir
+        server.output_dir = output_dir
+    # validate configuration
     if not pipeline.is_valid(args.server_name):
         logging.error("Pipeline config not valid")
         return config.JOB_ERROR

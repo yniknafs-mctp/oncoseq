@@ -36,7 +36,7 @@ def inspect_rnaseq_library(bowtie_index,
     bowtie_threads = max(1, num_processors-1)
     args = ["bowtie", "-q", "-S",
             "-p", str(bowtie_threads),
-            "-v", 2, "-k", 1, "-m", 1]
+            "-v", 3, "-k", 1, "-m", 1]
     # different approaches for single-read or paired-end
     if len(fastq_files) == 1:
         # for single read we cannot readily estimate the fragment size 

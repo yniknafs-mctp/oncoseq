@@ -20,20 +20,6 @@ BOWTIE2_QUAL_MAP = {SANGER_FORMAT: '--phred33',
                     SOLEXA_FORMAT: '--solexa-quals',
                     ILLUMINA_FORMAT: '--phred64'}
 
-# FASTQC constants
-SANGER_ENCODING = "Sanger / Illumina 1.9"
-SOLEXA_ENCODING = "Illumina < 1.3"
-ILLUMINA_13_ENCODING = "Illumina 1.3"
-ILLUMINA_15_ENCODING = "Illumina 1.5"
-ENCODING_VALUES = (SANGER_ENCODING, 
-                   SOLEXA_ENCODING, 
-                   ILLUMINA_13_ENCODING, 
-                   ILLUMINA_15_ENCODING)
-ENCODING_TO_QUAL_FORMAT = {SANGER_ENCODING: SANGER_FORMAT,
-                           SOLEXA_ENCODING: SOLEXA_FORMAT,
-                           ILLUMINA_13_ENCODING: ILLUMINA_FORMAT,
-                           ILLUMINA_15_ENCODING: ILLUMINA_FORMAT}
-
 #Translation table for reverse Complement, with ambiguity codes
 DNA_COMPLEMENT = maketrans( "ACGTRYKMBDHVacgtrykmbdhv", "TGCAYRMKVHDBtgcayrmkvhdb" )
 RNA_COMPLEMENT = maketrans( "ACGURYKMBDHVacgurykmbdhv", "UGCAYRMKVHDBugcayrmkvhdb" )
@@ -114,27 +100,6 @@ def get_qual_conversion_func(qual_format):
     tbl = conv_tables[qual_format]
     return lambda q: q.translate(tbl)
 
-def get_fastqc_sequence_length(fastqc_data_file):
-    for line in open(fastqc_data_file):
-        if not line: continue
-        line = line.strip()
-        if line.startswith("Sequence length"):
-            return int(line.split()[-1])
-
-def get_fastqc_total_sequences(fastqc_data_file):
-    for line in open(fastqc_data_file):
-        if not line: continue
-        line = line.strip()
-        if line.startswith("Total Sequences"):
-            return int(line.split()[-1])
-
-def get_fastqc_encoding(fastqc_data_file):
-    for line in open(fastqc_data_file):
-        if not line: continue
-        line = line.strip()
-        if line.startswith("Encoding"):
-            return line.split("\t")[-1]
-
 def get_abundant_counts(abundant_counts_file):
     counts = []
     for line in open(abundant_counts_file):
@@ -166,7 +131,7 @@ def open_compressed(fastq_file):
         filehandle = open(fastq_file, "r")
     return filehandle
 
-def detect_read_length(fastq_file):
+def get_first_read_length(fastq_file):
     f = open_compressed(fastq_file)
     f.next()
     seq = f.next()

@@ -20,8 +20,6 @@ MIN_INSPECT_SAMPLES = 100
 # job return codes
 JOB_SUCCESS = 0
 JOB_ERROR = 1
-# gzip/bz2 compress level
-DEFAULT_COMPRESS_LEVEL = 5
 # XML files
 LIBRARY_XML_FILE = "library.xml"
 CONFIG_XML_FILE = "config.xml"
@@ -34,8 +32,6 @@ FASTQC_DIR_EXTENSION = "_fastqc"
 FASTQC_DATA_FILE = "fastqc_data.txt"
 FASTQC_REPORT_FILE = "fastqc_report.html"
 # abundant sequence mapping
-ABUNDANT_SAM_FILES = make_pe_files('abundant_hits','.sam')
-ABUNDANT_BAM_FILE = 'abundant_hits.bam'
 SORTED_ABUNDANT_BAM_FILE = 'abundant_hits.srt.bam'
 ABUNDANT_COUNTS_FILE = 'abundant_counts.txt'
 # filtered fastq files
@@ -73,11 +69,11 @@ TOPHAT_FUSION_BAM_INDEX_FILE = TOPHAT_FUSION_BAM_FILE + ".bai"
 TOPHAT_FUSION_FILE = os.path.join(TOPHAT_FUSION_DIR, "fusions.out")
 TOPHAT_FUSION_POST_RESULT_FILE = os.path.join(TOPHAT_FUSION_DIR, 'result.txt')
 TOPHAT_FUSION_POST_HTML_FILE = os.path.join(TOPHAT_FUSION_DIR, 'result.html')
-TOPHAT_FUSION_POST_TMP_FILES = (os.path.join(TOPHAT_FUSION_DIR, f) 
+TOPHAT_FUSION_POST_TMP_FILES = [os.path.join(TOPHAT_FUSION_DIR, f) 
                                 for f in ("check", "fusion_seq.bwtout", 
                                           "fusion_seq.map", 
                                           "fusion_seq.fa", 
-                                          "potential_fusion.txt"))
+                                          "potential_fusion.txt")]
 # picard metrics files
 PICARD_ALIGNMENT_SUMMARY_METRICS = "picard.alignment_summary_metrics"
 PICARD_INSERT_SIZE_HISTOGRAM_PDF = "picard.insert_size_histogram.pdf"
@@ -125,11 +121,6 @@ PBS_STDERR_FILE = "pbs.stderr"
 # script files
 PBS_SCRIPT_FILE = "run.pbs"
 SHELL_SCRIPT_FILE = "run.sh"
-# quality score formats
-SANGER_FORMAT = "sanger"
-SOLEXA_FORMAT = "solexa"
-ILLUMINA_FORMAT = "illumina"
-FASTQ_QUAL_FORMATS = (SANGER_FORMAT, SOLEXA_FORMAT, ILLUMINA_FORMAT)
 
 class PipelineConfigError(Exception):
     pass

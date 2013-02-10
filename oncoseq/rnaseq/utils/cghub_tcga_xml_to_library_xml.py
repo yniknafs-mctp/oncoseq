@@ -23,10 +23,8 @@ def main():
     parser.add_argument("--library-protocol", dest="library_protocol", default=POLYA_TRANSCRIPTOME)
     parser.add_argument("--param", dest="param_list", action="append", default=None)
     parser.add_argument("--seq-repo", dest="seq_repo", default="tcga")
-    parser.add_argument("--xls", dest="write_xls", action="store_true", default=False)
-    parser.add_argument("--xml", dest="write_xml", action="store_true", default=False)
     parser.add_argument("xml_file")
-    parser.add_argument("root_dir")
+    parser.add_argument("seq_repo_dir")
     args = parser.parse_args()
     # parse param list
     default_params = {}
@@ -62,7 +60,7 @@ def main():
                 continue
             correct_filesize = int(file_elem.findtext("filesize"))
             subpath = os.path.join(disease_abbr, analysis_id, filename)
-            path = os.path.join(args.root_dir, subpath)
+            path = os.path.join(args.seq_repo_dir, subpath)
             if not os.path.exists(path):
                 logging.error("Analysis %s not found" % (analysis_id))
                 continue
@@ -104,22 +102,6 @@ def main():
         # indent for pretty printing
         indent_xml(root)
         print etree.tostring(root)
-    elif args.write_xls:
-        pass
-    else:
-        # print file headers
-        header_fields = ["study_id", "cohort_id", "patient_id", "sample_id", 
-                         "library_id", "description", "species", 
-                         "library_protocol", "library_type", 
-                         "fragment_layout", "seq_repo", 
-                         "read1_files", "read2_files", "bam_files"]
-        print '\t'.join(header_fields)
-        print '\t'.join(header_fields)
-        fields = [study_id, disease_abbr, patient_id, sample_id, aliquot_id,
-                  legacy_sample_id, args.species, args.library_protocol, 
-                  args.library_type, fragment_layout, 
-                  args.seq_repo, "", "", bam_files[0]]
-        print '\t'.join(fields)
 
 if __name__ == '__main__':
     sys.exit(main())

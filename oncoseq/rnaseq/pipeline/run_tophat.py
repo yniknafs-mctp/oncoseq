@@ -10,10 +10,10 @@ import sys
 
 # project imports
 from oncoseq.rnaseq.lib.inspect import RnaseqLibraryMetrics
-from oncoseq.rnaseq.lib.base import detect_read_length
+from oncoseq.rnaseq.lib.fastqc import get_most_common_sequence_length
 
-def run_tophat(output_dir, fastq_files, library_metrics_file,
-               bowtie_index, num_processors,
+def run_tophat(output_dir, fastq_files, fastqc_data_files, 
+               library_metrics_file, bowtie_index, num_processors,
                rg_id, rg_sample, rg_library, rg_description, 
                rg_platform_unit, rg_center, rg_platform,
                tophat_args):
@@ -23,7 +23,7 @@ def run_tophat(output_dir, fastq_files, library_metrics_file,
     frag_size_mean = int(round(obj.tlen_at_percentile(50.0),0))
     frag_size_stdev = int(round(obj.std(),0))    
     # get fragment size parameters for tophat
-    read_length = detect_read_length(fastq_files[0])
+    read_length = get_most_common_sequence_length(fastqc_data_files[0])
     mean_inner_dist = int(frag_size_mean - 2*read_length)
     mate_stdev = frag_size_stdev
     logging.info("Tophat mean_inner_dist=%d and mate_stdev=%d" % 
@@ -67,10 +67,12 @@ def main():
     parser.add_argument("output_dir")
     parser.add_argument("bowtie_index")
     parser.add_argument("library_metrics_file")
-    parser.add_argument("fastq_files", nargs="+")
+    parser.add_argument("fastqc_data_files")
+    parser.add_argument("fastq_files")
     args = parser.parse_args()
     return run_tophat(output_dir=args.output_dir,
-                      fastq_files=args.fastq_files,
+                      fastq_files=args.fastq_files.split(','),
+                      fastqc_data_files = args.fastqc_data_files.split(','),
                       library_metrics_file=args.library_metrics_file,
                       bowtie_index=args.bowtie_index,
                       num_processors=args.num_processors, 

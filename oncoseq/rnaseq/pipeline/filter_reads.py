@@ -11,8 +11,9 @@ import subprocess
 
 # project imports
 from oncoseq.rnaseq.lib.base import BOWTIE2_QUAL_MAP, \
-    file_exists_and_nz_size, get_fastqc_encoding, \
-    ENCODING_TO_QUAL_FORMAT, check_executable
+    file_exists_and_nz_size, check_executable
+    
+import oncoseq.rnaseq.lib.fastqc as fastqc
 import oncoseq.rnaseq.lib.config as config
 import oncoseq.rnaseq.pipeline
 _pipeline_dir = oncoseq.rnaseq.pipeline.__path__[0]
@@ -22,11 +23,11 @@ def get_quality_score_encoding(fastqc_data_files):
     encodings = set()
     for f in fastqc_data_files:
         if file_exists_and_nz_size(f):
-            encoding = get_fastqc_encoding(f)
-            if encoding not in ENCODING_TO_QUAL_FORMAT:
+            encoding = fastqc.get_encoding(f)
+            if encoding not in fastqc.ENCODING_TO_QUAL_FORMAT:
                 logging.error("Unrecognized FASTQ encoding %s" % (encoding))
                 return config.JOB_ERROR, None
-            encodings.add(ENCODING_TO_QUAL_FORMAT[encoding])
+            encodings.add(fastqc.ENCODING_TO_QUAL_FORMAT[encoding])
     if len(encodings) > 1:
         logging.error("Detected different FASTQ encodings in paired-end files")
         return config.JOB_ERROR, None
