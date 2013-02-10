@@ -28,7 +28,7 @@ def bash_remove_files(filenames):
     for f in filenames:        
         command = "test -e %s && rm -rf %s" % (f,f)
         commands.append(command)
-        commands.append(bash_check_retcode())
+        commands.append(bash_check_retcode("error trying to remove file %s" % (f)))
     return commands
 
 def bash_set_tmpdir(tmp_dir):
@@ -57,13 +57,14 @@ def concatenate_sequences(input_files, output_file):
         elif fmt == "txt":
             cmd = 'cat %s >> %s' % (filename, prefix)
         commands.append(cmd)
-        commands.append(bash_check_retcode())
+        commands.append(bash_check_retcode("concatenating sequences failed"))
     fmt = detect_format(output_file)
     if fmt == "gz":
         commands.append('gzip %s' % (prefix))
+        commands.append(bash_check_retcode("gzip failed"))
     elif fmt == "bz2":
         commands.append('bzip2 %s' % (prefix))
-    commands.append(bash_check_retcode())
+        commands.append(bash_check_retcode("bzip2 failed"))
     return commands
 
 def get_pbs_header(job_name,
