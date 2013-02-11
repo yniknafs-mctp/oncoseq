@@ -171,7 +171,8 @@ DISEASE_MAP = {'LAML': {'cancer_type': 'aml'},
                'STAD': {'cancer_type': 'gastric_carcinoma'},
                'THCA': {'cancer_type': 'thyroid_carcinoma'},
                'UCS': {'cancer_type': 'uterine_carcinosarcoma'},
-               'UCEC': {'cancer_type': 'uterine_corpus_endometrioid_carcinoma'}}
+               'UCEC': {'cancer_type': 'uterine_corpus_endometrioid_carcinoma'},
+               'CNTL': {}}
                
 COHORT_MAP = {'LAML': 'blood',
                'ACC': 'adrenal_gland',
@@ -203,7 +204,8 @@ COHORT_MAP = {'LAML': 'blood',
                'STAD': 'gastric',
                'THCA': 'thyroid',
                'UCS': 'uterus',
-               'UCEC': 'uterus'}
+               'UCEC': 'uterus',
+               'CNTL': 'control'}               
 
 def main():
     logging.basicConfig(level=logging.DEBUG,
@@ -213,8 +215,10 @@ def main():
     parser.add_argument("--library-type", dest="library_type", default=FR_UNSTRANDED)
     parser.add_argument("--library-protocol", dest="library_protocol", default=POLYA_TRANSCRIPTOME)
     parser.add_argument("--param", dest="param_list", action="append", default=None)
-    parser.add_argument("--seq-repo", dest="seq_repo", default="tcga")
-    parser.add_argument("xml_file")
+    parser.add_argument("--xml", dest="write_xml", action="store_true", default=False)
+    parser.add_argument("--skip-missing", dest="skip_missing", action="store_true", default=False)
+    parser.add_argument("cghub_xml_file")
+    parser.add_argument("seq_repo")
     parser.add_argument("seq_repo_dir")
     args = parser.parse_args()
     # parse param list
@@ -225,7 +229,7 @@ def main():
             default_params[k] = v
     # read libraries
     libraries = []
-    tree = etree.parse(args.xml_file)  
+    tree = etree.parse(args.cghub_xml_file)  
     root = tree.getroot()
     for elem in root.findall("Result"):
         study_id = elem.findtext("study")
@@ -251,22 +255,25 @@ def main():
                 logging.error("File %s not a BAM file" % (filename))
                 continue
             correct_filesize = int(file_elem.findtext("filesize"))
+            # TODO: we have a heterogeneous method for storing the 
+            # TCGA bam files, so must check multiple directory structures            
             subpath = os.path.join(disease_abbr, analysis_id, filename)
             path = os.path.join(args.seq_repo_dir, subpath)
             if not os.path.exists(path):
+                subpath = os.path.join("round2", analysis_id, filename)
+                path = os.path.join(args.seq_repo_dir, subpath)
+            if not os.path.exists(path):
                 logging.error("Analysis %s not found" % (analysis_id))
-                continue
-            filesize = os.path.getsize(path)
-            if filesize != correct_filesize:
-                logging.error("Analysis %s has incorrect filesize" % (analysis_id))
-                continue
-            bam_files.append(subpath)
+            else:
+                filesize = os.path.getsize(path)
+                if filesize != correct_filesize:
+                    logging.error("Analysis %s has incorrect filesize" % (analysis_id))
+                else:
+                    bam_files.append(subpath)
         if len(bam_files) == 0:
             logging.error("Analysis %s has no valid bam files" % (analysis_id))
-            continue
-        if len(bam_files) > 1:
-            logging.error("Analysis %s has multiple valid bam files" % (analysis_id))
-            continue
+            if args.skip_missing:
+                continue
         kwargs = {'study_id': study_id,
                   'cohort_id': COHORT_MAP[disease_abbr],
                   'patient_id': patient_id,
@@ -280,7 +287,7 @@ def main():
                   'seq_repo': args.seq_repo,
                   'read1_files': '',
                   'read2_files': '',
-                  'bam_files': bam_files[0]}
+                  'bam_files': ','.join(bam_files)}
         kwargs['params'] = {'tcga_cancer_type': disease_abbr,
                             'tcga_legacy_sample_id': legacy_sample_id,
                             'tcga_sample_type': sample_type}
@@ -290,12 +297,35 @@ def main():
         library = Library(**kwargs)
         libraries.append(library)
     # write
-    root = etree.Element("libraries")
-    for library in libraries:
-        library.to_xml(root)
-    # indent for pretty printing
-    indent_xml(root)
-    print etree.tostring(root)
+    if args.write_xml:
+        root = etree.Element("libraries")
+        for library in libraries:
+            library.to_xml(root)
+        # indent for pretty printing
+        indent_xml(root)
+        print etree.tostring(root)
+    else:
+        # build list of all parameters
+        params = set()
+        for library in libraries:
+            params.update(library.params.keys())
+        sorted_params = sorted(params)
+        # output table
+        header_fields = []
+        header_fields.extend(Library.fields)
+        header_fields.extend(sorted_params)
+        print '\t'.join(header_fields)
+        for library in libraries:
+            fields = []
+            library.read1_files = ','.join(library.read1_files)
+            library.read2_files = ','.join(library.read2_files)
+            library.bam_files = ','.join(library.bam_files)
+            for field_name in Library.fields:
+                fields.append(getattr(library, field_name))
+            for param in sorted_params:
+                fields.append(library.params.get(param, "na"))
+            print '\t'.join(fields)
+
 
 if __name__ == '__main__':
     sys.exit(main())

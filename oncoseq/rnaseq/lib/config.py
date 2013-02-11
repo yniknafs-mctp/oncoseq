@@ -528,7 +528,7 @@ class GenomeConfig(object):
         annovar_elem = elem.find("annovar")
         g.annovar_db = annovar_elem.findtext("db")
         g.annovar_buildver = annovar_elem.findtext("buildver")
-        g.annovar_cosmicver = annovar_elem.findtext("cosmicver")
+        g.annovar_cosmicver = annovar_elem.findtext("cosmicver", )
         g.annovar_summary_args = annovar_elem.findtext("summary_args")
         for attrname in GenomeConfig.fields:
             setattr(g, attrname, elem.findtext(attrname))
