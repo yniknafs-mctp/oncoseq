@@ -25,6 +25,9 @@ def main():
     parser.add_argument("counts_file")
     parser.add_argument("fastq_files")
     args = parser.parse_args()
+    # check command line
+    if (args.sam_file != "-") and (not os.path.exists(args.sam_file)):
+        parser.error("SAM file %s not found" % (args.sam_file))
     # open input files
     suffix = os.path.splitext(args.sam_file)[-1]
     mode = 'rb' if suffix == '.bam' else 'r'
