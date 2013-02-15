@@ -148,7 +148,7 @@ def check_sam_file(filename, isbam=False):
             fmt = "rb" if isbam else "r"
             samfh = pysam.Samfile(filename, fmt)
             samfh.close()   
-        except:
+        except IOError:
             is_valid = False
     return is_valid
 
