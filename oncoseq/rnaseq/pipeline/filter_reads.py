@@ -63,6 +63,7 @@ def filter_reads(bowtie2_index,
     else:
         args.extend(['-1', input_files[0],
                      '-2', input_files[1]])
+    logging.debug("bowtie2 args: %s" % (' '.join(map(str, args))))
     aln_p = subprocess.Popen(args, stdout=subprocess.PIPE)
     # filter reads
     logging.info("Filtering reads")

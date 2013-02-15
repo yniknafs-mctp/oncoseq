@@ -228,6 +228,9 @@ def read_library_table_xls(filename):
         field_dict["params"] = myparams
         # build object
         library = Library(**field_dict)
+        # skip blank lines
+        if not library.library_id:
+            continue
         # ensure unique ids
         if library.library_id in libraries:
             raise Exception("Found duplicate library id %s" % (library.library_id))
