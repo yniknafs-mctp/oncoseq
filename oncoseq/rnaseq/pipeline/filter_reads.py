@@ -71,6 +71,7 @@ def filter_reads(bowtie2_index,
     unsorted_bam_file = os.path.join(tmp_dir, prefix + ".unsorted.bam") 
     args = ["python", os.path.join(_pipeline_dir, "filter_reads_child.py"),
             "-", unsorted_bam_file, counts_file, ','.join(output_files)]
+    logging.debug("filter_reads_child args: %s" % (' '.join(map(str, args))))
     retcode = subprocess.call(args, stdin=aln_p.stdout)
     if retcode != 0:
         logging.error("filter_reads_child.py failed with error code %d" % (retcode))
