@@ -65,6 +65,7 @@ def main():
     # read libraries
     libraries = {}
     for output_dir in library_paths:
+        logging.debug("Processing %s" % (output_dir))
         library_xml_file = os.path.join(output_dir, config.LIBRARY_XML_FILE)
         if not os.path.exists(library_xml_file):
             logging.error("Library '%s' xml file not found" % (output_dir))
@@ -73,7 +74,7 @@ def main():
         config_xml_file = os.path.join(output_dir, config.CONFIG_XML_FILE)
         fields = []
         if not os.path.exists(config_xml_file):
-            fields.extend(['na'] * len(RESULT_HEADER_FIELDS))
+            fields.extend(['na'] * len(RESULT_HEADER_FIELDS))        
         else:
             # get results
             pipeline = config.PipelineConfig.from_xml(config_xml_file)
