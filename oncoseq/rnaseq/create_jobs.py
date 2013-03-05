@@ -263,7 +263,6 @@ def create_job(library, pipeline, server, config_xml_file,
         for i,prefix in enumerate(results.bam_fastq_prefixes):
             args = ["python",
                     os.path.join(_pipeline_dir, "extract_fastq_from_bam.py"),
-                    "--readnum-in-qname",
                     "--tmp-dir", results.tmp_dir,
                     library.bam_files[i], prefix,
                     '> %s 2>&1' % (log_file)] 

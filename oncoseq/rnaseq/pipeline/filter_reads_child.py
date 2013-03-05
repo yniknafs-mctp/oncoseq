@@ -61,9 +61,7 @@ def main():
                 counts[altype][r.tid] += 1            
                 outbamfh.write(r)
     else:
-        for pe_reads in parse_sam(insamfh, 
-                                  readnum_in_qname=False, 
-                                  remove_suffix=True):
+        for pe_reads in parse_sam(insamfh, remove_suffix=True):
             r1, r2 = remove_multihits(pe_reads)
             # check for unmatched reads or parsing errors
             if (r1 is None) or (r2 is None):

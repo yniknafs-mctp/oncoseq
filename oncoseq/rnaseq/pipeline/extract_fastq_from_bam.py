@@ -11,14 +11,14 @@ import subprocess
 
 import pysam
 
-from oncoseq.rnaseq.lib.base import parse_sam, remove_multihits, to_fastq_sr, to_fastq
-from oncoseq.rnaseq.lib.libtable import FRAGMENT_LAYOUT_SINGLE, FRAGMENT_LAYOUT_PAIRED
+from oncoseq.rnaseq.lib.base import parse_sam, remove_multihits, \
+    to_fastq, check_executable
 import oncoseq.rnaseq.pipeline
 _pipeline_dir = oncoseq.rnaseq.pipeline.__path__[0]
 
 
 def bam_to_fastq(bam_file, fastq_prefix, assume_sorted, 
-                 readnum_in_qname, tmp_dir): 
+                 tmp_dir): 
     # get sort order of bam file
     sort_order = None
     f = pysam.Samfile(bam_file, 'rb')
@@ -66,8 +66,7 @@ def bam_to_fastq(bam_file, fastq_prefix, assume_sorted,
     # parse bam
     logging.debug("writing fastq files")
     bamfh = pysam.Samfile(sorted_bam_file, 'rb')
-    for pe_reads in parse_sam(bamfh, readnum_in_qname, 
-                              remove_suffix=True):
+    for pe_reads in parse_sam(bamfh, remove_suffix=True):
         r1, r2 = remove_multihits(pe_reads)
         if (r1 is None) and (r2 is None):
             raise Exception("Error parsing SAM file")
@@ -106,8 +105,6 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--assume-sorted', dest="assume_sorted",
                         action="store_true", default=False)
-    parser.add_argument('--readnum-in-qname', dest="readnum_in_qname", 
-                        action="store_true", default=False)
     parser.add_argument('--tmp-dir', dest="tmp_dir", default="/tmp")
     parser.add_argument('bam_file')
     parser.add_argument('fastq_prefix')
@@ -116,11 +113,13 @@ def main():
         parser.error("Input bam file not found")
     if not os.path.exists(args.tmp_dir):
         parser.error("tmp dir %s not found" % (args.tmp_dir))
+    # check command line args
+    if not check_executable("samtools"):
+        parser.error("samtools binary not found")
     tmp_dir = os.path.abspath(args.tmp_dir)
     return bam_to_fastq(args.bam_file, 
                         args.fastq_prefix, 
                         args.assume_sorted,
-                        args.readnum_in_qname,
                         tmp_dir)
 
 if __name__ == '__main__':

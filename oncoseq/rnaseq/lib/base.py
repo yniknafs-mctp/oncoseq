@@ -188,7 +188,7 @@ def parse_pe_reads(bamfh):
     if num_reads > 0:
         yield pe_reads
 
-def parse_sam(sam_iter, readnum_in_qname=False, remove_suffix=False):
+def parse_sam(sam_iter, remove_suffix=False):
     '''
     reads must be sorted by queryname 
     '''
@@ -197,18 +197,26 @@ def parse_sam(sam_iter, readnum_in_qname=False, remove_suffix=False):
     prev_qname = None    
     for r in sam_iter:
         suffix = r.qname[-2:]
-        # determine whether this is read1 or read2
-        if readnum_in_qname:
-            # use "/1" or "/2" suffix to determine read number
+        readnum = None
+        # paired reads should have SAM flag set for 
+        # segment number within template
+        if r.is_paired:
+            if r.is_read1:
+                readnum = 0
+            elif r.is_read2:
+                readnum = 1
+        # if SAM flag is bad/missing or reads are unpaired 
+        # try to use "/1" or "/2" suffix to determine 
+        # segment number
+        if readnum is None:
             if (suffix == "/1"):
                 readnum = 0
             elif (suffix == "/2"):
                 readnum = 1
             else:
                 readnum = 0
-        else:
-            readnum = 1 if r.is_read2 else 0
-        # optionally remove the /1 or /2 suffix
+        # optionally remove the /1 or /2 suffix in qname
+        # so that paired reads can be grouped by name
         if (remove_suffix and 
             (suffix == "/1" or suffix == "/2")):
             r.qname = r.qname[:-2]
