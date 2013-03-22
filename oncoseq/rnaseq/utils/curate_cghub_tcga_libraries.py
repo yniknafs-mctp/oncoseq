@@ -217,10 +217,22 @@ def main():
     parser.add_argument("--param", dest="param_list", action="append", default=None)
     parser.add_argument("--xml", dest="write_xml", action="store_true", default=False)
     parser.add_argument("--skip-missing", dest="skip_missing", action="store_true", default=False)
+    parser.add_argument("--ignore", dest="ignore_file", default=None)
     parser.add_argument("cghub_xml_file")
     parser.add_argument("seq_repo")
     parser.add_argument("seq_repo_dir")
     args = parser.parse_args()
+    # check params
+    if not os.path.exists(args.cghub_xml_file):
+        parser.error("cghub_xml_file %s not found" % (args.cghub_xml_file))
+    if not os.path.exists(args.seq_repo_dir):
+        parser.error("seq_repo_dir %s not found" % (args.seq_repo_dir))
+    if args.ignore_file is not None:
+        if not os.path.exists(args.ignore_file):
+            parser.error("ignore_file %s not found" % (args.ignore_file))
+        ignore_libraries = set([x.strip() for x in open(args.ignore_file)])
+    else:
+        ignore_libraries = set()
     # parse param list
     default_params = {}
     if args.param_list is not None:
@@ -228,16 +240,27 @@ def main():
             k,v = param.split("=")
             default_params[k] = v
     # read libraries
-    libraries = []
+    libraries = {}
     tree = etree.parse(args.cghub_xml_file)  
     root = tree.getroot()
+    ignored = 0
+    file_not_found = 0
+    wrong_filesize = 0
+    no_bam = 0
+    redundant = 0
+    total_results = 0
     for elem in root.findall("Result"):
+        total_results += 1
+        analysis_id = elem.findtext("analysis_id")
+        aliquot_id = elem.findtext("aliquot_id")
+        if aliquot_id in ignore_libraries:
+            logging.warning("Ignoring analysis %s aliquot %s" % (analysis_id, aliquot_id))
+            ignored += 1
+            continue
         study_id = elem.findtext("study")
         patient_id = elem.findtext("participant_id")
         sample_id = elem.findtext("sample_id")
-        aliquot_id = elem.findtext("aliquot_id")
         legacy_sample_id = elem.findtext("legacy_sample_id")
-        analysis_id = elem.findtext("analysis_id")
         disease_abbr = elem.findtext("disease_abbr")
         sample_type = elem.findtext('sample_type')
         analysis_id = analysis_id
@@ -255,24 +278,23 @@ def main():
                 logging.error("File %s not a BAM file" % (filename))
                 continue
             correct_filesize = int(file_elem.findtext("filesize"))
-            # TODO: we have a heterogeneous method for storing the 
-            # TCGA bam files, so must check multiple directory structures            
-            subpath = os.path.join(disease_abbr, analysis_id, filename)
+            subpath = os.path.join(analysis_id, filename)
             path = os.path.join(args.seq_repo_dir, subpath)
             if not os.path.exists(path):
-                subpath = os.path.join("round2", analysis_id, filename)
-                path = os.path.join(args.seq_repo_dir, subpath)
-            if not os.path.exists(path):
                 logging.error("Analysis %s not found" % (analysis_id))
+                file_not_found += 1
+                continue
+            filesize = os.path.getsize(path)
+            if filesize != correct_filesize:
+                logging.error("Analysis %s has incorrect filesize" % (analysis_id))
+                wrong_filesize += 1
             else:
-                filesize = os.path.getsize(path)
-                if filesize != correct_filesize:
-                    logging.error("Analysis %s has incorrect filesize" % (analysis_id))
-                else:
-                    bam_files.append(subpath)
+                bam_files.append(subpath)
         if len(bam_files) == 0:
             logging.error("Analysis %s has no valid bam files" % (analysis_id))
+            no_bam += 1
             if args.skip_missing:
+                logging.warning("Skipping missing analysis %s" % (analysis_id))
                 continue
         kwargs = {'study_id': study_id,
                   'cohort_id': COHORT_MAP[disease_abbr],
@@ -295,7 +317,20 @@ def main():
         kwargs['params'].update(SAMPLE_TYPE_MAP[sample_type])
         kwargs['params'].update(DISEASE_MAP[disease_abbr])
         library = Library(**kwargs)
-        libraries.append(library)
+        # handle duplicate libraries
+        if library.library_id in libraries:
+            logging.warning("Redundant result for aliquot %s" % (library.library_id))
+            redundant += 1
+            # always keep paired end if available
+            if library.fragment_layout == FRAGMENT_LAYOUT_PAIRED:
+                libraries[library.library_id] = library
+    libraries = libraries.values()
+    logging.info("ignored: %d" % (ignored))
+    logging.info("file not found: %d" % file_not_found)
+    logging.info("wrong filesize: %d" % wrong_filesize)
+    logging.info("no bam: %d" % no_bam)
+    logging.info("redundant: %d" % (redundant))
+    logging.info("total: %d " % (total_results))
     # write
     if args.write_xml:
         root = etree.Element("libraries")

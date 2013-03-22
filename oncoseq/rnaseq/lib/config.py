@@ -114,8 +114,8 @@ ANNOVAR_COSMIC_FILTERED_FILE_FUNC = lambda p, bv, cv: "%s.%s_%s_filtered" % (p, 
 # job complete
 JOB_DONE_FILE = "job.done"
 # job memory and runtime
-PBS_JOB_MEM = 24000
-PBS_JOB_WALLTIME = "120:00:00"
+PBS_JOB_MEM = 45000
+PBS_JOB_WALLTIME = "168:00:00"
 PBS_STDOUT_FILE = "pbs.stdout"
 PBS_STDERR_FILE = "pbs.stderr"
 # script files
