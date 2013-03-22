@@ -324,6 +324,7 @@ def main():
             # always keep paired end if available
             if library.fragment_layout == FRAGMENT_LAYOUT_PAIRED:
                 libraries[library.library_id] = library
+        libraries[library.library_id] = library
     libraries = libraries.values()
     logging.info("ignored: %d" % (ignored))
     logging.info("file not found: %d" % file_not_found)
