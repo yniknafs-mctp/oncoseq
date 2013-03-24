@@ -216,7 +216,6 @@ def main():
     parser.add_argument("--library-protocol", dest="library_protocol", default=POLYA_TRANSCRIPTOME)
     parser.add_argument("--param", dest="param_list", action="append", default=None)
     parser.add_argument("--xml", dest="write_xml", action="store_true", default=False)
-    parser.add_argument("--skip-missing", dest="skip_missing", action="store_true", default=False)
     parser.add_argument("--ignore", dest="ignore_file", default=None)
     parser.add_argument("cghub_xml_file")
     parser.add_argument("seq_repo")
@@ -249,6 +248,7 @@ def main():
     no_bam = 0
     redundant = 0
     total_results = 0
+    no_bam_fileh = open("bam_not_found.txt", "w")
     for elem in root.findall("Result"):
         total_results += 1
         analysis_id = elem.findtext("analysis_id")
@@ -293,9 +293,8 @@ def main():
         if len(bam_files) == 0:
             logging.error("Analysis %s has no valid bam files" % (analysis_id))
             no_bam += 1
-            if args.skip_missing:
-                logging.warning("Skipping missing analysis %s" % (analysis_id))
-                continue
+            print >>no_bam_fileh, analysis_id
+            continue
         kwargs = {'study_id': study_id,
                   'cohort_id': COHORT_MAP[disease_abbr],
                   'patient_id': patient_id,
@@ -326,6 +325,7 @@ def main():
                 libraries[library.library_id] = library
         libraries[library.library_id] = library
     libraries = libraries.values()
+    no_bam_fileh.close()
     logging.info("ignored: %d" % (ignored))
     logging.info("file not found: %d" % file_not_found)
     logging.info("wrong filesize: %d" % wrong_filesize)
