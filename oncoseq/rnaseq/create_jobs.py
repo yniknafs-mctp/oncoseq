@@ -171,7 +171,9 @@ def submit_nopbs(shell_commands,
     return retcode
 
 def create_job(library, pipeline, server, config_xml_file, 
-               num_processors, keep_tmp, overwrite):
+               num_processors, keep_tmp, overwrite,
+               pbs_job_walltime,
+               pbs_job_mem):
     # search for library sequence files
     success = config.resolve_library_sequence_files(server, library)
     if not success:
@@ -877,8 +879,8 @@ def create_job(library, pipeline, server, config_xml_file,
                                       node_processors=server.node_processors,
                                       node_memory=server.node_mem,
                                       pbs_script_lines=server.pbs_script_lines, 
-                                      walltime=config.PBS_JOB_WALLTIME, 
-                                      mem=config.PBS_JOB_MEM,
+                                      walltime=pbs_job_walltime, 
+                                      mem=pbs_job_mem,
                                       stdout_filename=results.pbs_stdout_file,
                                       stderr_filename=results.pbs_stderr_file)    
         for command in pbs_commands:
@@ -902,6 +904,12 @@ def main():
     parser.add_argument("-p", type=int, dest="num_processors", 
                         default=1,
                         help="Number of processors per job")
+    parser.add_argument("--pbs-walltime", dest="pbs_walltime",
+                        default=config.PBS_JOB_WALLTIME,
+                        help="Job walltime [default=%(default)s]")
+    parser.add_argument("--pbs-mem", dest="pbs_mem",
+                        default=config.PBS_JOB_MEM,
+                        help="Job memory [default=%(default)s]")
     parser.add_argument("-o", "--output-dir", dest="output_dir", 
                         default=None, help="Overwrite output directory "
                         "specified in config xml file")
@@ -915,6 +923,11 @@ def main():
                         default=False,
                         help="overwrite existing job files "
                         "[default=%(default)s]")
+    parser.add_argument("--library-subset", dest="library_subset_file",
+                        default=None,
+                        help="text file containing specific library identifier(s) "
+                        "to process (one per line). If not specified then entire "
+                        "XML/XLS file will be processed")  
     inp_group = parser.add_mutually_exclusive_group(required=True)
     inp_group.add_argument("--xls", dest="library_xls_file", 
                            default=None,
@@ -924,11 +937,6 @@ def main():
                            default=None,
                            help="XML formatted file containing RNA-Seq "
                            "library information")
-    parser.add_argument("--library-id", dest="input_library_ids",
-                        action="append", default=None,
-                        help="specific library identifier(s) "
-                        "to process [entire XML/Excel files processed "
-                        "by default]")
     parser.add_argument("config_xml_file")
     parser.add_argument("server_name")
     args = parser.parse_args()
@@ -964,11 +972,11 @@ def main():
         logging.error("Pipeline config not valid")
         return config.JOB_ERROR
     server = pipeline.servers[args.server_name]
-    # sublist of library ids
-    if args.input_library_ids is None:
+    # subset of library ids
+    if args.library_subset_file is None:
         input_library_ids = None
     else:
-        input_library_ids = set(args.input_library_ids)
+        input_library_ids = set([x.strip() for x in open(args.library_subset_file)])
     #
     # read libraries
     #
@@ -987,7 +995,7 @@ def main():
         # read libraries from XLS/XLSX
         logging.info("Reading library table '%s'" % (args.library_xls_file))
         libraries = read_library_table_xls(args.library_xls_file)
-        if input_library_ids is not None:            
+        if input_library_ids is not None:
             libraries = dict((x,libraries[x]) for x in input_library_ids)
     #
     # process each library
@@ -999,7 +1007,9 @@ def main():
                              args.config_xml_file, 
                              args.num_processors, 
                              args.keep_tmp,
-                             args.overwrite)
+                             args.overwrite,
+                             args.pbs_job_walltime,
+                             args.pbs_job_mem)
         if retcode != 0:
             logging.error("Library %s error" % (library.library_id))
     logging.info("Done")
