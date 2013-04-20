@@ -1008,8 +1008,8 @@ def main():
                              args.num_processors, 
                              args.keep_tmp,
                              args.overwrite,
-                             args.pbs_job_walltime,
-                             args.pbs_job_mem)
+                             args.pbs_walltime,
+                             args.pbs_mem)
         if retcode != 0:
             logging.error("Library %s error" % (library.library_id))
     logging.info("Done")
