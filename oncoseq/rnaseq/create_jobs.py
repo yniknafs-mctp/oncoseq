@@ -907,7 +907,7 @@ def main():
     parser.add_argument("--pbs-walltime", dest="pbs_walltime",
                         default=config.PBS_JOB_WALLTIME,
                         help="Job walltime [default=%(default)s]")
-    parser.add_argument("--pbs-mem", dest="pbs_mem",
+    parser.add_argument("--pbs-mem", dest="pbs_mem", type=int,
                         default=config.PBS_JOB_MEM,
                         help="Job memory [default=%(default)s]")
     parser.add_argument("-o", "--output-dir", dest="output_dir", 
