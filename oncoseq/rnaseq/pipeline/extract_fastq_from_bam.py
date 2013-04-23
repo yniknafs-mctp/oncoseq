@@ -16,17 +16,20 @@ from oncoseq.rnaseq.lib.base import parse_sam, remove_multihits, \
 import oncoseq.rnaseq.pipeline
 _pipeline_dir = oncoseq.rnaseq.pipeline.__path__[0]
 
-
 def bam_to_fastq(bam_file, fastq_prefix, assume_sorted, 
                  tmp_dir): 
-    # get sort order of bam file
+    # try to get the sort order from the header
     sort_order = None
-    f = pysam.Samfile(bam_file, 'rb')
-    if 'HD' in f.header:
-        hd_dict = f.header['HD']
-        if 'SO' in hd_dict:
-            sort_order = hd_dict['SO']
-    f.close()
+    try:
+        f = pysam.Samfile(bam_file, 'rb')
+        if 'HD' in f.header:
+            hd_dict = f.header['HD']
+            if 'SO' in hd_dict:
+                sort_order = hd_dict['SO']        
+        f.close()
+    except Exception as e:
+        logging.warning("Error while trying to read BAM header: %s" % (str(e)))
+        sort_order = None
     # decide whether to sort bam file
     if assume_sorted or (sort_order == "queryname"):
         sorted_bam_file = bam_file
