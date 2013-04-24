@@ -29,8 +29,7 @@ RESULT_HEADER_FIELDS = ["results_valid",
                         'pct_intergenic_bases',
                         'median_5prime_to_3prime_bias',
                         'median_cv_coverage',
-                        'bam_file',
-                        'ab_initio_gtf_file']
+                        'results_dir']
 
 def main():
     logging.basicConfig(level=logging.DEBUG,
@@ -116,14 +115,7 @@ def main():
                                metrics_dict['MEDIAN_CV_COVERAGE']])
             else:
                 fields.extend(['na'] * 6)
-            if os.path.exists(results.tophat_bam_file):
-                fields.append(results.tophat_bam_file)
-            else:
-                fields.append('na')
-            if os.path.exists(results.cufflinks_ab_initio_gtf_file):
-                fields.append(results.cufflinks_ab_initio_gtf_file)
-            else:
-                fields.append('na')
+            fields.append(output_dir)
         libraries[library.library_id] = (library, fields)
     # build list of all parameters
     params = set()
