@@ -48,16 +48,18 @@ def concatenate_sequences(input_files, output_file):
     else:
         prefix = os.path.splitext(output_file)[0]
     commands = []
+    cat_mode = '>'
     for filename in input_files:
         fmt = detect_format(filename)
         if fmt == "gz":
-            cmd = 'gzip -cd %s >> %s' % (filename, prefix)
+            cmd = 'gzip -cd %s %s %s' % (filename, cat_mode, prefix)
         elif fmt == "bz2":
-            cmd = 'bzip2 -cd %s >> %s' % (filename, prefix)
+            cmd = 'bzip2 -cd %s %s %s' % (filename, cat_mode, prefix)
         elif fmt == "txt":
-            cmd = 'cat %s >> %s' % (filename, prefix)
+            cmd = 'cat %s %s %s' % (filename, cat_mode, prefix)
         commands.append(cmd)
         commands.append(bash_check_retcode("concatenating sequences failed"))
+        cat_mode = '>>'
     fmt = detect_format(output_file)
     if fmt == "gz":
         commands.append('gzip %s' % (prefix))

@@ -1,5 +1,5 @@
 '''
-Created on Dec 2, 2012
+Created on Apr 29, 2013
 
 @author: mkiyer
 '''
@@ -218,14 +218,11 @@ def main():
     parser.add_argument("--xml", dest="write_xml", action="store_true", default=False)
     parser.add_argument("--ignore", dest="ignore_file", default=None)
     parser.add_argument("cghub_xml_file")
-    parser.add_argument("seq_repo")
-    parser.add_argument("seq_repo_dir")
+    parser.add_argument("seq_repo")    
     args = parser.parse_args()
     # check params
     if not os.path.exists(args.cghub_xml_file):
         parser.error("cghub_xml_file %s not found" % (args.cghub_xml_file))
-    if not os.path.exists(args.seq_repo_dir):
-        parser.error("seq_repo_dir %s not found" % (args.seq_repo_dir))
     if args.ignore_file is not None:
         if not os.path.exists(args.ignore_file):
             parser.error("ignore_file %s not found" % (args.ignore_file))
@@ -248,7 +245,6 @@ def main():
     no_bam = 0
     redundant = 0
     total_results = 0
-    no_bam_fileh = open("bam_not_found.txt", "w")
     for elem in root.findall("Result"):
         total_results += 1
         analysis_id = elem.findtext("analysis_id")
@@ -277,24 +273,12 @@ def main():
             if os.path.splitext(filename)[-1] != ".bam":
                 logging.error("File %s not a BAM file" % (filename))
                 continue
-            correct_filesize = int(file_elem.findtext("filesize"))
+            #filesize = int(file_elem.findtext("filesize"))
             subpath = os.path.join(analysis_id, filename)
-            path = os.path.join(args.seq_repo_dir, subpath)
-            if not os.path.exists(path):
-                logging.error("Analysis %s not found" % (analysis_id))
-                file_not_found += 1
-                continue
-            filesize = os.path.getsize(path)
-            if filesize != correct_filesize:
-                logging.error("Analysis %s has incorrect filesize" % (analysis_id))
-                wrong_filesize += 1
-            else:
-                bam_files.append(subpath)
+            bam_files.append(subpath)
         if len(bam_files) == 0:
             logging.error("Analysis %s has no valid bam files" % (analysis_id))
             no_bam += 1
-            print >>no_bam_fileh, analysis_id
-            continue
         kwargs = {'study_id': study_id,
                   'cohort_id': COHORT_MAP[disease_abbr],
                   'patient_id': patient_id,
@@ -325,7 +309,6 @@ def main():
                 libraries[library.library_id] = library
         libraries[library.library_id] = library
     libraries = libraries.values()
-    no_bam_fileh.close()
     logging.info("ignored: %d" % (ignored))
     logging.info("file not found: %d" % file_not_found)
     logging.info("wrong filesize: %d" % wrong_filesize)
@@ -365,4 +348,3 @@ def main():
 
 if __name__ == '__main__':
     sys.exit(main())
-        

@@ -1,5 +1,5 @@
 '''
-Created on Apr 24, 2013
+Created on May 15, 2013
 
 @author: mkiyer
 '''
@@ -44,6 +44,7 @@ def main():
                      "a list of result paths or '--dir' to search a directory for "
                      "results")     
     # read gene fusion information
+    print '\t'.join(["sample_id", "library_id", "gtf_file", "bam_file"])
     for output_dir in sorted(library_paths):
         logging.debug("Processing %s" % (output_dir))
         library_xml_file = os.path.join(output_dir, config.LIBRARY_XML_FILE)
@@ -58,26 +59,14 @@ def main():
         # get results
         pipeline = config.PipelineConfig.from_xml(config_xml_file)
         results = config.RnaseqResults(library, pipeline, output_dir)
-        #param_field = ','.join(['%s=%s' % (k,library.params[k]) 
-        #                        for k in sorted(library.params.keys())])
-        if 'cancer_progression' in library.params:
-            progression_field = library.params['cancer_progression']
+        if (not os.path.exists(results.tophat_bam_file) or 
+            not os.path.exists(results.cufflinks_ab_initio_gtf_file)):
+            logging.error("Library '%s' result file(s) not found" % (output_dir))
         else:
-            progression_field = 'na'
-        fields = [library.study_id, library.cohort_id, library.patient_id,
-                  library.sample_id, progression_field]
-        # get fusions
-        if not os.path.exists(results.tophat_fusion_post_result_file):
-            logging.error("Library '%s' fusion result file not found" % (output_dir))
-        else:
-            fusion_lines = [x.strip().split('\t') for x in open(results.tophat_fusion_post_result_file)]
-            num_fusions = len(fusion_lines)
-        if num_fusions == 0:
-            fusion_lines = [[library.library_id] + ['na'] * 10]
-        # make output fields
-        fields.append(str(num_fusions))
-        for fusion_fields in fusion_lines:
-            print '\t'.join(fields + fusion_fields) 
-    
+            fields = [library.sample_id, library.library_id, 
+                      results.cufflinks_ab_initio_gtf_file,
+                      results.tophat_bam_file]
+            print '\t'.join(fields) 
+
 if __name__ == '__main__':
     sys.exit(main())
