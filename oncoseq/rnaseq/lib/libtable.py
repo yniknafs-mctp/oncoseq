@@ -236,3 +236,4 @@ def read_library_table_xls(filename):
             raise Exception("Found duplicate library id %s" % (library.library_id))
         libraries[library.library_id] = library
     return libraries
+

@@ -22,7 +22,7 @@ from Cython.Distutils import build_ext
 
 def main():
     setup(name="oncoseq",
-          version='0.3.1',
+          version='0.3.2',
           description="high-throughput sequence data analysis in cancer",
           long_description=__doc__,
           author = "Matthew Iyer",
