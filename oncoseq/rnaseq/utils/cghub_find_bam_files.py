@@ -274,7 +274,7 @@ def main():
         for file_elem in files_elem.findall("file"):
             filename = file_elem.findtext("filename")
             if os.path.splitext(filename)[-1] != ".bam":
-                logging.error("File %s not a BAM file" % (filename))
+                logging.warning("Skipping file %s (not a BAM file)" % (filename))
                 continue
             correct_filesize = int(file_elem.findtext("filesize"))
             subpath = os.path.join(analysis_id, filename)
