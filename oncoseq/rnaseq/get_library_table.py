@@ -21,6 +21,9 @@ RESULT_HEADER_FIELDS = ["results_valid",
                         "predicted_library_type",
                         "frag_size_mean",
                         "frag_size_stdev",
+                        "mitochondrial_reads",
+                        "ribosomal_reads",
+                        "total_abundant_reads",
                         "total_aligned_reads", 
                         "mean_read_length", 
                         'aligned_bases',
@@ -30,6 +33,16 @@ RESULT_HEADER_FIELDS = ["results_valid",
                         'median_5prime_to_3prime_bias',
                         'median_cv_coverage',
                         'results_dir']
+
+def read_abundant_counts(filename):
+    d = {}
+    with open(filename) as fileh:
+        header_fields = fileh.next().strip().split('\t')
+        total_ind = header_fields.index('total')
+        for line in fileh:
+            fields = line.strip().split('\t')
+            d[fields[0]] = int(fields[total_ind])
+    return d
 
 def main():
     logging.basicConfig(level=logging.DEBUG,
@@ -99,6 +112,15 @@ def main():
                                frag_size_stdev])
             else:
                 fields.extend(['na'] * 4)
+            if os.path.exists(results.abundant_counts_file):
+                abundant_counts_dict = read_abundant_counts(results.abundant_counts_file)
+                tot_abundant_counts = sum(abundant_counts_dict.values())
+                tot_abundant_counts -= abundant_counts_dict['*']
+                fields.append(abundant_counts_dict['chrM'])
+                fields.append(abundant_counts_dict['humRibosomal'])
+                fields.append(tot_abundant_counts)
+            else:
+                fields.extend(['na'] * 3)
             if os.path.exists(results.alignment_summary_metrics):
                 obj = picard.AlignmentSummaryMetrics(results.alignment_summary_metrics)
                 fields.append(obj.get_total_reads())
